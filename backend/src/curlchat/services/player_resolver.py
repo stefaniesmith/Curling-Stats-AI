@@ -1,0 +1,1 @@
+"""Player resolution service placeholder."""

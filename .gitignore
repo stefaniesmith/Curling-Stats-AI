@@ -21,6 +21,10 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+node_modules/
+.pnpm-store/
+.vite/
+coverage/
 
 # Environment and local config
 .env
@@ -32,3 +36,7 @@ dist/
 
 # OS files
 .DS_Store
+
+# Local databases and docker state
+*.sqlite3
+*.db
