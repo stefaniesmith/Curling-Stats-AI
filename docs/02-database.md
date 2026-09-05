@@ -109,11 +109,12 @@ Each row contains:
 * player
 * event
 * event year
-* team information
+* team code
 * position
+* alternate designation
 * win/loss record
-* shot totals
-* shot percentages
+* inturn, outturn, draw, takeout, and all-shot quantities
+* corresponding shot percentages
 
 The combination of:
 
@@ -124,6 +125,11 @@ The combination of:
 is unique.
 
 This table intentionally stores yearly statistics rather than aggregated career totals. Aggregate values are calculated using SQL when required.
+
+The imported names match the archive's player-record fields: `inturn_total`,
+`outturn_total`, `draw_total`, `takeout_total`, and `shots_total`, each paired
+with a percentage. The archive's precomputed career totals are deliberately
+not stored; they are derived from yearly rows using total-weighted percentages.
 
 ---
 

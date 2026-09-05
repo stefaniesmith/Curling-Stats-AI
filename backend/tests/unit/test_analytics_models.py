@@ -29,3 +29,25 @@ def test_statistics_identity_is_unique_per_player_event_and_year() -> None:
         == ("player_id", "event_id", "event_year")
         for constraint in unique_constraints
     )
+
+
+def test_statistics_match_the_archive_yearly_record_fields() -> None:
+    assert set(PlayerEventStatistics.__table__.columns.keys()) >= {
+        "event_year",
+        "team",
+        "position",
+        "alternate",
+        "games",
+        "wins",
+        "losses",
+        "inturn_total",
+        "inturn_percent",
+        "outturn_total",
+        "outturn_percent",
+        "draw_total",
+        "draw_percent",
+        "takeout_total",
+        "takeout_percent",
+        "shots_total",
+        "shots_percent",
+    }

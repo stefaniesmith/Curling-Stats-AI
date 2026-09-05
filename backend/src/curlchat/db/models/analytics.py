@@ -1,8 +1,6 @@
-"""ORM models for the read-oriented Curling Canada analytics schema."""
+"""ORM models for Curling Canada's player statistics archive."""
 
 from __future__ import annotations
-
-from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -10,7 +8,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    Numeric,
     SmallInteger,
     String,
     UniqueConstraint,
@@ -21,28 +18,26 @@ from curlchat.db.session import Base
 
 
 class Player(Base):
-    """A canonical athlete identity from the Curling Canada archive."""
+    """One canonical player record after archive ``aka`` redirects are resolved."""
 
     __tablename__ = "players"
     __table_args__ = (
         UniqueConstraint("normalized_name", name="uq_players_normalized_name"),
-        {"comment": "Canonical Curling Canada player identities."},
+        {"comment": "Canonical player records from the Curling Canada statistics archive."},
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Surrogate primary key.")
     display_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Player name displayed to users."
+        String(255), nullable=False, comment="Archive player name in display order."
     )
     sortable_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Player name formatted for deterministic sorting."
+        String(255), nullable=False, comment="Archive player name in surname-first sort order."
     )
     normalized_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Normalized canonical name used for identity matching."
+        String(255), nullable=False, comment="Normalized player name used for deterministic lookup."
     )
     source_slug: Mapped[str | None] = mapped_column(
-        String(255),
-        nullable=True,
-        comment="Original player slug from the source archive, when available.",
+        String(255), nullable=True, comment="Source player-file slug when available."
     )
 
     aliases: Mapped[list[PlayerAlias]] = relationship(
@@ -52,7 +47,7 @@ class Player(Base):
 
 
 class PlayerAlias(Base):
-    """A historical or alternate name belonging to one canonical player."""
+    """An archive ``aka`` source name that redirects to a canonical player."""
 
     __tablename__ = "player_aliases"
     __table_args__ = (
@@ -60,27 +55,27 @@ class PlayerAlias(Base):
             "player_id", "normalized_name", name="uq_player_aliases_player_normalized_name"
         ),
         Index("ix_player_aliases_normalized_name", "normalized_name"),
-        {"comment": "Historical and alternate names that resolve to canonical players."},
+        {"comment": "Archive aka names that resolve to canonical player records."},
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Surrogate primary key.")
     player_id: Mapped[int] = mapped_column(
         ForeignKey("players.id", ondelete="CASCADE"),
         nullable=False,
-        comment="Canonical player represented by this alias.",
+        comment="Canonical player targeted by the archive aka redirect.",
     )
     alias_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Alias exactly as found in the archive."
+        String(255), nullable=False, comment="Archive aka name in surname-first sort order."
     )
     normalized_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Normalized alias used for deterministic lookup."
+        String(255), nullable=False, comment="Normalized archive aka name used for lookup."
     )
 
     player: Mapped[Player] = relationship(back_populates="aliases")
 
 
 class Event(Base):
-    """A supported Curling Canada competition archive collection."""
+    """A supported competition in the Curling Canada archive."""
 
     __tablename__ = "events"
     __table_args__ = (
@@ -89,35 +84,35 @@ class Event(Base):
             "first_event_year IS NULL OR last_event_year IS NULL OR first_event_year <= last_event_year",
             name="ck_events_year_range",
         ),
-        {"comment": "Supported Curling Canada competition archive collections."},
+        {"comment": "Competitions represented in the Curling Canada statistics archive."},
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Surrogate primary key.")
     display_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Competition name displayed to users."
+        String(255), nullable=False, comment="Archive event name displayed to users."
     )
     source_slug: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="Unique event identifier from the source archive."
+        String(255), nullable=False, comment="Stable source identifier for this archive event."
     )
     first_event_year: Mapped[int | None] = mapped_column(
-        SmallInteger, nullable=True, comment="Earliest event year available in the source archive."
+        SmallInteger, nullable=True, comment="Earliest imported year for this event."
     )
     last_event_year: Mapped[int | None] = mapped_column(
-        SmallInteger, nullable=True, comment="Latest event year available in the source archive."
+        SmallInteger, nullable=True, comment="Latest imported year for this event."
     )
     has_shot_statistics: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=False,
         server_default="false",
-        comment="Whether this event provides shot statistics.",
+        comment="Whether imported records for this event include shot statistics.",
     )
 
     player_statistics: Mapped[list[PlayerEventStatistics]] = relationship(back_populates="event")
 
 
 class PlayerEventStatistics(Base):
-    """One player's yearly performance in one supported event."""
+    """One archive player record for an event year; career totals are derived."""
 
     __tablename__ = "player_event_statistics"
     __table_args__ = (
@@ -130,104 +125,86 @@ class PlayerEventStatistics(Base):
         CheckConstraint(
             "event_year BETWEEN 1800 AND 2500", name="ck_player_event_statistics_event_year"
         ),
-        CheckConstraint(
-            "games_played IS NULL OR games_played >= 0",
-            name="ck_player_event_statistics_games_played",
-        ),
+        CheckConstraint("games IS NULL OR games >= 0", name="ck_player_event_statistics_games"),
         CheckConstraint("wins IS NULL OR wins >= 0", name="ck_player_event_statistics_wins"),
         CheckConstraint("losses IS NULL OR losses >= 0", name="ck_player_event_statistics_losses"),
-        CheckConstraint(
-            "draw_made IS NULL OR draw_made >= 0", name="ck_player_event_statistics_draw_made"
+        *(
+            CheckConstraint(
+                f"{name}_total IS NULL OR {name}_total >= 0",
+                name=f"ck_player_event_statistics_{name}_total",
+            )
+            for name in ("inturn", "outturn", "draw", "takeout", "shots")
         ),
-        CheckConstraint(
-            "draw_attempted IS NULL OR draw_attempted >= 0",
-            name="ck_player_event_statistics_draw_attempted",
-        ),
-        CheckConstraint(
-            "takeout_made IS NULL OR takeout_made >= 0",
-            name="ck_player_event_statistics_takeout_made",
-        ),
-        CheckConstraint(
-            "takeout_attempted IS NULL OR takeout_attempted >= 0",
-            name="ck_player_event_statistics_takeout_attempted",
-        ),
-        CheckConstraint(
-            "total_made IS NULL OR total_made >= 0", name="ck_player_event_statistics_total_made"
-        ),
-        CheckConstraint(
-            "total_attempted IS NULL OR total_attempted >= 0",
-            name="ck_player_event_statistics_total_attempted",
-        ),
-        CheckConstraint(
-            "draw_percent IS NULL OR draw_percent BETWEEN 0 AND 100",
-            name="ck_player_event_statistics_draw_percent",
-        ),
-        CheckConstraint(
-            "takeout_percent IS NULL OR takeout_percent BETWEEN 0 AND 100",
-            name="ck_player_event_statistics_takeout_percent",
-        ),
-        CheckConstraint(
-            "total_percent IS NULL OR total_percent BETWEEN 0 AND 100",
-            name="ck_player_event_statistics_total_percent",
+        *(
+            CheckConstraint(
+                f"{name}_percent IS NULL OR {name}_percent BETWEEN 0 AND 100",
+                name=f"ck_player_event_statistics_{name}_percent",
+            )
+            for name in ("inturn", "outturn", "draw", "takeout", "shots")
         ),
         Index("ix_player_event_statistics_event_year", "event_id", "event_year"),
-        {"comment": "Yearly player performance records for supported Curling Canada events."},
+        {
+            "comment": "Archive yearly player statistics; career totals are calculated from these rows."
+        },
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Surrogate primary key.")
     player_id: Mapped[int] = mapped_column(
-        ForeignKey("players.id"), nullable=False, comment="Player whose performance is recorded."
+        ForeignKey("players.id"),
+        nullable=False,
+        comment="Player represented by this archive record.",
     )
     event_id: Mapped[int] = mapped_column(
-        ForeignKey("events.id"),
-        nullable=False,
-        comment="Competition in which the performance occurred.",
+        ForeignKey("events.id"), nullable=False, comment="Event represented by this archive record."
     )
     event_year: Mapped[int] = mapped_column(
-        SmallInteger, nullable=False, comment="Year of the competition."
+        SmallInteger, nullable=False, comment="Archive event year."
     )
-    team_name: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, comment="Team name shown in the archive for this event year."
-    )
-    province: Mapped[str | None] = mapped_column(
-        String(100), nullable=True, comment="Province or territory represented in this event year."
+    team: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="Archive team code for this event year."
     )
     position: Mapped[str | None] = mapped_column(
-        String(50), nullable=True, comment="Curling position played in this event year."
+        String(50), nullable=True, comment="Archive player position for this event year."
     )
-    games_played: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Number of games played."
+    alternate: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True, comment="Whether the archive marks the player as an alternate."
     )
-    wins: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="Number of games won.")
+    games: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="Archive games-played value."
+    )
+    wins: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="Archive wins value.")
     losses: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Number of games lost."
+        Integer, nullable=True, comment="Archive losses value."
     )
-    draw_made: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Successful draw shots."
+    inturn_total: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="Archive inturn quantity."
     )
-    draw_attempted: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Attempted draw shots."
+    inturn_percent: Mapped[int | None] = mapped_column(
+        SmallInteger, nullable=True, comment="Archive inturn percentage."
     )
-    draw_percent: Mapped[Decimal | None] = mapped_column(
-        Numeric(5, 2), nullable=True, comment="Draw-shot percentage from 0 through 100."
+    outturn_total: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="Archive outturn quantity."
     )
-    takeout_made: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Successful takeout shots."
+    outturn_percent: Mapped[int | None] = mapped_column(
+        SmallInteger, nullable=True, comment="Archive outturn percentage."
     )
-    takeout_attempted: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Attempted takeout shots."
+    draw_total: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="Archive draw quantity."
     )
-    takeout_percent: Mapped[Decimal | None] = mapped_column(
-        Numeric(5, 2), nullable=True, comment="Takeout-shot percentage from 0 through 100."
+    draw_percent: Mapped[int | None] = mapped_column(
+        SmallInteger, nullable=True, comment="Archive draw percentage."
     )
-    total_made: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Successful shots of all types."
+    takeout_total: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="Archive takeout quantity."
     )
-    total_attempted: Mapped[int | None] = mapped_column(
-        Integer, nullable=True, comment="Attempted shots of all types."
+    takeout_percent: Mapped[int | None] = mapped_column(
+        SmallInteger, nullable=True, comment="Archive takeout percentage."
     )
-    total_percent: Mapped[Decimal | None] = mapped_column(
-        Numeric(5, 2), nullable=True, comment="Overall shot percentage from 0 through 100."
+    shots_total: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="Archive all-shots quantity."
+    )
+    shots_percent: Mapped[int | None] = mapped_column(
+        SmallInteger, nullable=True, comment="Archive all-shots percentage."
     )
 
     player: Mapped[Player] = relationship(back_populates="event_statistics")
