@@ -1,9 +1,12 @@
 # Alembic migrations
 
-This directory is reserved for Alembic migration scripts.
+This directory contains the Alembic environment and schema revisions.
 
-Planned next step:
+Run migrations from the `backend` directory:
 
-1. initialize Alembic
-2. create the initial analytics schema migration
-3. add PostgreSQL comments for tables and columns
+```bash
+uv run alembic upgrade head
+```
+
+Alembic reads `DATABASE_URL` through `curlchat.db.session.Settings`. The initial
+revision creates the four documented analytics tables and their PostgreSQL comments.
