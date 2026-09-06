@@ -46,10 +46,20 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
         "prompt": app_graph.SYSTEM_PROMPT,
     }
     query_schema = app_graph.query_analytics.args_schema.model_json_schema()
+    resolver_schema = app_graph.resolve_player.args_schema.model_json_schema()
     assert "sql" not in query_schema["properties"]
     assert set(query_schema["properties"]) == {"request", "resolved_players"}
     assert "display_name" in str(query_schema)
     assert "player_id" in str(query_schema)
+    assert resolver_schema["properties"]["name"]["description"] == (
+        "The player name exactly as the user expressed it, including an alias or misspelling."
+    )
+    assert query_schema["properties"]["request"]["description"] == (
+        "The user's analytical question in natural language, never SQL."
+    )
+    assert "Successful Player Resolver results only" in query_schema["properties"]["resolved_players"][
+        "description"
+    ]
     assert "never generate, request, or\nexpose SQL" in app_graph.SYSTEM_PROMPT
 
 

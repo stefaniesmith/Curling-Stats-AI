@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
@@ -56,7 +58,12 @@ class AnalyticsQueryToolResult(BaseModel):
 
 
 @tool
-def resolve_player(name: str) -> str:
+def resolve_player(
+    name: Annotated[
+        str,
+        Field(description="The player name exactly as the user expressed it, including an alias or misspelling."),
+    ],
+) -> str:
     """Resolve a player name before asking a question about that player's statistics."""
     with SessionLocal() as session:
         resolution = resolve_player_name(session, name)
@@ -77,7 +84,19 @@ def resolve_player(name: str) -> str:
 
 @tool
 def query_analytics(
-    request: str, resolved_players: list[ResolvedPlayerIdentity] | None = None
+    request: Annotated[
+        str,
+        Field(description="The user's analytical question in natural language, never SQL."),
+    ],
+    resolved_players: Annotated[
+        list[ResolvedPlayerIdentity] | None,
+        Field(
+            description=(
+                "Successful Player Resolver results only. Each display_name/player_id pair "
+                "preserves the identity mapping for this request."
+            )
+        ),
+    ] = None,
 ) -> str:
     """Answer an analytical request using resolved player identities; never provide SQL.
 
