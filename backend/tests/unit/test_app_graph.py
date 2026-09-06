@@ -192,6 +192,35 @@ def test_respond_to_message_collects_visualization_artifacts(monkeypatch: pytest
     assert response.artifacts[0].type == "chart"
 
 
+def test_respond_to_message_omits_artifacts_from_prior_persisted_turns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeGraph:
+        def invoke(self, _: dict[str, object], config: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    SimpleNamespace(type="human", content="Show prior results"),
+                    SimpleNamespace(
+                        name="create_visualization",
+                        content='{"type":"chart","payload":{"title":"Old chart"}}',
+                    ),
+                    SimpleNamespace(type="ai", content="Here is the old chart."),
+                    SimpleNamespace(type="human", content="Show current results"),
+                    SimpleNamespace(
+                        name="create_visualization",
+                        content='{"type":"chart","payload":{"title":"New chart"}}',
+                    ),
+                    SimpleNamespace(type="ai", content="Here is the new chart."),
+                ]
+            }
+
+    monkeypatch.setattr(app_graph, "build_graph", lambda settings=None, checkpointer=None: FakeGraph())
+
+    response = app_graph.respond_to_message("Show current results", uuid4())
+
+    assert [artifact.payload["title"] for artifact in response.artifacts] == ["New chart"]
+
+
 def test_message_text_extracts_responses_content_blocks() -> None:
     assert app_graph._message_text(
         [{"type": "text", "text": "First"}, {"type": "text", "text": "Second"}]

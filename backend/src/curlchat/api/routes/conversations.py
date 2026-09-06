@@ -17,4 +17,7 @@ def get_conversation_service() -> ConversationService:
 @router.get("", response_model=list[ConversationResponse])
 def list_conversations() -> list[ConversationResponse]:
     """List metadata without exposing or duplicating LangGraph messages."""
-    return [ConversationResponse.model_validate(item) for item in get_conversation_service().list()]
+    return [
+        ConversationResponse.model_validate(item, from_attributes=True)
+        for item in get_conversation_service().list()
+    ]

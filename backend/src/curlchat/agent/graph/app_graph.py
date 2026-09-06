@@ -126,7 +126,7 @@ def respond_to_message(
     messages = state["messages"]
     return AgentResponse(
         message=_message_text(messages[-1].content),
-        artifacts=_visualization_artifacts(messages),
+        artifacts=_visualization_artifacts(_current_turn_messages(messages)),
     )
 
 
@@ -146,6 +146,19 @@ def _visualization_artifacts(messages: list[Any]) -> tuple[VisualizationArtifact
         except (ValidationError, ValueError):
             continue
     return tuple(artifacts)
+
+
+def _current_turn_messages(messages: list[Any]) -> list[Any]:
+    """Return messages after the latest user message in persisted graph state."""
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        message_type = (
+            message.get("type") if isinstance(message, dict) else getattr(message, "type", None)
+        )
+        role = message.get("role") if isinstance(message, dict) else getattr(message, "role", None)
+        if message_type == "human" or role == "user":
+            return messages[index + 1 :]
+    return messages
 
 
 def _message_text(content: Any) -> str:
