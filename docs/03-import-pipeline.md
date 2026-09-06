@@ -67,6 +67,15 @@ uv run python -m curlchat.ingest.cli --source /path/to/curling-canada-stats-arch
 The command runs the import in one database transaction. A validation failure
 therefore prevents a partial import from being committed.
 
+For a fresh local database, apply the schema migration and provision the
+read-only application role before importing:
+
+```bash
+uv run alembic upgrade head
+uv run python scripts/provision_app_role.py
+uv run python -m curlchat.ingest.cli --source /path/to/curling-canada-stats-archive
+```
+
 ---
 
 ## Player Import
@@ -106,17 +115,16 @@ does not guess which identity is correct.
 
 ## Event Import
 
-Each archive collection is treated as an independent event in the initial
-application. Examples include Hearts, Brier, Canadian Cup, Canadian Women,
-and the men's and women's Olympic Trials.
+Each canonical player document contains exactly one `totals[].event` value.
+The importer uses that event name as the canonical event family for every
+yearly record in that document. For example, a document whose career totals
+name `Canadian Women's` maps its historical `Diamond D` and `CLCA` yearly rows
+to the `Canadian Women's` event. The yearly source event value is validated but
+is not stored as a separate event identity.
 
-The importer derives a stable event slug from the source event name and
+The importer derives a stable event slug from this canonical event name and
 upserts the corresponding `events` record. It also derives the first and last
 available years and whether any imported record contains all-shot quantities.
-
-Treating source collections as independent events keeps the initial analytics
-model faithful to the archive. Historical relationships between competitions
-are intentionally outside the scope of this import pipeline.
 
 ---
 
@@ -145,7 +153,9 @@ all-shot quantities and percentages. Missing historical shot statistics stay
 ### Totals are not imported
 
 The archive publishes precomputed career totals and may include yearly rows
-whose team is `Totals`. CurlChat intentionally skips both.
+whose team is `Totals`. CurlChat intentionally skips both numeric aggregates.
+It uses only the `event` name from a career totals block as source metadata for
+the canonical yearly event family.
 
 Aggregates are derived dynamically from imported player stints using SQL. This
 keeps one source of truth for yearly and career calculations, avoids storing
@@ -189,7 +199,7 @@ events, yearly records, and skipped conflicting aliases.
 
 The import pipeline turns the archive's distributed Jekyll player records into
 a normalized PostgreSQL dataset designed for analysis. Canonical player
-identities, historical aliases, independent events, and source-level player
-stints become reliable relational data while archive totals remain derived at
-query time. PostgreSQL is therefore the single analytical source of truth for
-CurlChat.
+identities, historical aliases, canonical event families, and source-level
+player stints become reliable relational data while archive totals remain
+derived at query time. PostgreSQL is therefore the single analytical source of
+truth for CurlChat.

@@ -17,3 +17,11 @@ Run the idempotent import from the `backend` directory:
 ```bash
 uv run python -m curlchat.ingest.cli --source /path/to/curling-canada-stats-archive
 ```
+
+For a fresh local database, run the schema migration and provision the
+least-privilege runtime role first:
+
+```bash
+uv run alembic upgrade head
+uv run python scripts/provision_app_role.py
+```

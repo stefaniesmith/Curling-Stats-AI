@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -67,6 +68,8 @@ def test_load_archive_discards_yearly_totals_and_retains_player_stints(tmp_path:
     document = """---
 name: Kevin Adams
 name-sort: Adams, Kevin
+totals:
+  - event: Brier
 years:
   - year: 1990
     event: Brier
@@ -94,6 +97,49 @@ years:
         ("QC", "Third"),
         ("QC", "Fourth"),
     }
+
+
+def test_load_archive_uses_totals_event_as_the_yearly_event_family(tmp_path: Path) -> None:
+    document = """---
+name: Joyce McKee
+name-sort: McKee, Joyce
+totals:
+  - event: Canadian Women's
+    games: 57
+years:
+  - year: 1961
+    event: Diamond D
+    team: SK
+    position: Fourth
+    games: 9
+  - year: 1969
+    event: CLCA
+    team: SK
+    position: Fourth
+    games: 9
+---
+"""
+    _write_archive_file(tmp_path, "canadian-women", "mckee-joyce.md", document)
+
+    dataset = load_archive(tmp_path)
+
+    assert [year.event for year in dataset.players[0].years] == [
+        "Canadian Women's",
+        "Canadian Women's",
+    ]
+
+
+def test_load_archive_requires_one_totals_event_mapping(tmp_path: Path) -> None:
+    document = """---
+name: Kevin Adams
+name-sort: Adams, Kevin
+years: []
+---
+"""
+    _write_archive_file(tmp_path, "brier", "adams-kevin.md", document)
+
+    with pytest.raises(ValueError, match="exactly one totals mapping"):
+        load_archive(tmp_path)
 
 
 def test_import_archive_upserts_yearly_statistics_and_aliases(tmp_path: Path) -> None:

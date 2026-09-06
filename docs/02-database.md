@@ -80,21 +80,21 @@ The Player Resolver service searches this table before SQL generation so the SQL
 
 Represents the competitions supported by the application.
 
-Each archive collection is treated as an independent event in the initial implementation.
-
+Events are canonical families derived from each source document's totals metadata.
 Examples include:
 
 * Hearts
 * Brier
-* Canadian Women
-* Canadian Cup (Men)
-* Canadian Cup (Women)
-* Olympic Trials (Men)
-* Olympic Trials (Women)
+* Canadian Women's
+* Canada Cup (Men)
+* Canada Cup (Women)
+* Trials (Men)
+* Trials (Women)
 
 Each event also stores metadata describing the competition, such as the years covered by the archive and whether shot statistics are available.
 
-Historical relationships between competitions are intentionally outside the scope of the initial implementation.
+Historical labels in yearly rows, such as Diamond D and CLCA, map to their
+document's canonical event family rather than becoming standalone events.
 
 ---
 

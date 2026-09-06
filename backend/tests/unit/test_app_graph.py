@@ -79,6 +79,9 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
         "description"
     ]
     assert "never generate, request, or expose SQL" in app_graph.SYSTEM_PROMPT.replace("\n", " ")
+    assert "Canada Cup (Men)" in app_graph.SYSTEM_PROMPT
+    assert "Tournament of Hearts \"Hearts\"" in app_graph.SYSTEM_PROMPT
+    assert "Scotties" in app_graph.SYSTEM_PROMPT
     assert set(visualization_schema["properties"]) == {"request"}
     assert visualization_schema["properties"]["request"]["description"] == (
         "One successful analytics result plus a typed table, summary, or chart specification. "

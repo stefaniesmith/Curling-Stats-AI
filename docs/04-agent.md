@@ -21,6 +21,13 @@ artifacts created during the turn through the chat endpoint. The model is
 instructed to resolve player identities before querying statistics, and it has
 no direct database access or SQL-generation responsibility.
 
+The system prompt also supplies the small, static archive event vocabulary. It
+uses the archive’s canonical terms when calling tools while interpreting common
+names such as “Scotties” and “Tournament of Hearts” as the source event
+“Hearts.” This lets the agent answer which event families are available without
+creating a separate catalog tool; the Event Resolver still validates event
+identities used in analytics queries.
+
 Conversation persistence and streaming remain later implementation steps.
 
 ---

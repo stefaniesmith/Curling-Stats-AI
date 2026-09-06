@@ -101,9 +101,9 @@ def event_slug(event_name: str) -> str:
 def load_archive(source_root: Path) -> ArchiveDataset:
     """Load canonical player files and ``aka`` redirects from an archive checkout.
 
-    The archive's career ``totals`` blocks and yearly ``team: Totals`` rows are
-    intentionally ignored. PostgreSQL derives those aggregates from source
-    player stints.
+    The numeric values in career ``totals`` blocks and yearly ``team: Totals``
+    rows are intentionally ignored. The one event name in each career totals
+    block canonically identifies that document's yearly source records.
     """
     player_root = source_root / "src" / "data" / "players"
     if not player_root.is_dir():
@@ -204,7 +204,8 @@ def _merge_player_documents(
     for document, path in documents:
         if _required_string(document, "name", path) != display_name:
             raise ArchiveImportError(f"Conflicting display names for {sortable_name!r}")
-        for year in _parse_years(document, path):
+        canonical_event = _canonical_event_name(document, path)
+        for year in _parse_years(document, path, canonical_event):
             identity = (
                 year.event,
                 year.year,
@@ -224,7 +225,17 @@ def _merge_player_documents(
     )
 
 
-def _parse_years(document: dict[str, Any], path: Path) -> tuple[ArchiveYear, ...]:
+def _canonical_event_name(document: dict[str, Any], path: Path) -> str:
+    """Read the document's one canonical event name without using its aggregates."""
+    totals = document.get("totals")
+    if not isinstance(totals, list) or len(totals) != 1 or not isinstance(totals[0], dict):
+        raise ArchiveImportError(f"Expected exactly one totals mapping in {path}")
+    return _required_string(totals[0], "event", path)
+
+
+def _parse_years(
+    document: dict[str, Any], path: Path, canonical_event: str
+) -> tuple[ArchiveYear, ...]:
     raw_years = document.get("years", [])
     if not isinstance(raw_years, list):
         raise ArchiveImportError(f"Expected a years list in {path}")
@@ -232,7 +243,7 @@ def _parse_years(document: dict[str, Any], path: Path) -> tuple[ArchiveYear, ...
     for raw_year in raw_years:
         if not isinstance(raw_year, dict):
             raise ArchiveImportError(f"Expected a yearly mapping in {path}")
-        event = _required_string(raw_year, "event", path)
+        _required_string(raw_year, "event", path)
         year = raw_year.get("year")
         if not isinstance(year, int):
             raise ArchiveImportError(f"Expected an integer year in {path}")
@@ -250,7 +261,7 @@ def _parse_years(document: dict[str, Any], path: Path) -> tuple[ArchiveYear, ...
         for field in STATISTIC_FIELDS:
             source_field = field.replace("_", "-")
             values[field] = _optional_int(raw_year.get(source_field), path)
-        parsed.append(ArchiveYear(event=event, year=year, values=values))
+        parsed.append(ArchiveYear(event=canonical_event, year=year, values=values))
     return tuple(parsed)
 
 
