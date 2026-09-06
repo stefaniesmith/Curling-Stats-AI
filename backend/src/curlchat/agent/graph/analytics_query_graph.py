@@ -1,4 +1,4 @@
-"""Scoped SQL generation and execution behind the analytics-query boundary."""
+"""Internal LangGraph workflow for generating and executing analytics queries."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ from typing import Any, Protocol
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
 from openai import OpenAIError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, Engine, inspect
 
 from curlchat.db.session import Settings
@@ -34,6 +35,21 @@ class ResolvedPlayerIdentity(BaseModel):
     player_id: int = Field(description="The resolved player's database identifier.")
 
 
+class AnalyticsQueryState(BaseModel):
+    """Pydantic state shared by the Analytics Query Tool's internal graph."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    request: str
+    resolved_players: tuple[ResolvedPlayerIdentity, ...] = Field(default_factory=tuple)
+    event_ids: tuple[int, ...] = Field(default_factory=tuple)
+    generated_query: GeneratedAnalyticsQuery | None = None
+    result: AnalyticsQueryResult | None = None
+    retry_count: int = 0
+    repair_error: str | None = None
+    retryable: bool = False
+
+
 class SqlGenerator(Protocol):
     """Generates a validated-shape query without executing it."""
 
@@ -42,6 +58,7 @@ class SqlGenerator(Protocol):
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity],
         event_ids: Sequence[int],
+        repair_error: str | None = None,
     ) -> GeneratedAnalyticsQuery: ...
 
 
@@ -64,6 +81,7 @@ class OpenAISqlGenerator:
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity],
         event_ids: Sequence[int],
+        repair_error: str | None = None,
     ) -> GeneratedAnalyticsQuery:
         result = self._model.invoke(
             [
@@ -76,6 +94,7 @@ class OpenAISqlGenerator:
                                 player.model_dump() for player in resolved_players
                             ],
                             "resolved_event_ids": list(event_ids),
+                            "previous_execution_error": repair_error,
                         }
                     )
                 ),
@@ -86,12 +105,13 @@ class OpenAISqlGenerator:
         return result
 
 
-class AnalyticsQueryService:
-    """Own SQL generation, SQL validation, execution, and query outcomes."""
+class AnalyticsQueryWorkflow:
+    """Orchestrate SQL generation and deterministic query execution."""
 
     def __init__(self, stats_service: StatsService, sql_generator: SqlGenerator) -> None:
         self._stats_service = stats_service
         self._sql_generator = sql_generator
+        self._graph = self._build_graph()
 
     def query(
         self,
@@ -100,24 +120,107 @@ class AnalyticsQueryService:
         event_ids: Sequence[int] = (),
     ) -> AnalyticsQueryResult:
         """Fulfill an analytical request without exposing SQL to the main agent."""
+        final_state = AnalyticsQueryState.model_validate(
+            self._graph.invoke(
+                AnalyticsQueryState(
+                    request=request,
+                    resolved_players=tuple(resolved_players),
+                    event_ids=tuple(event_ids),
+                ).model_dump()
+            )
+        )
+        return final_state.result or AnalyticsQueryResult(
+            status=AnalyticsQueryStatus.EXECUTION_FAILURE,
+            message="The analytics query could not be completed.",
+        )
+
+    def _build_graph(self):
+        graph = StateGraph(AnalyticsQueryState)
+        graph.add_node("generate_query", self._generate_query)
+        graph.add_node("execute_query", self._execute_query)
+        graph.add_edge(START, "generate_query")
+        graph.add_edge("generate_query", "execute_query")
+        graph.add_conditional_edges(
+            "execute_query",
+            self._next_step,
+            {"retry": "generate_query", "complete": END},
+        )
+        return graph.compile()
+
+    def _generate_query(self, state: AnalyticsQueryState) -> dict[str, object]:
         try:
-            generated_query = self._sql_generator.generate(request, resolved_players, event_ids)
+            generated_query = self._sql_generator.generate(
+                state.request,
+                state.resolved_players,
+                state.event_ids,
+                state.repair_error,
+            )
         except (OpenAIError, TypeError, ValueError):
-            return AnalyticsQueryResult(
-                status=AnalyticsQueryStatus.EXECUTION_FAILURE,
-                message="The analytics query could not be generated.",
-            )
+            return {
+                "result": AnalyticsQueryResult(
+                    status=AnalyticsQueryStatus.EXECUTION_FAILURE,
+                    message="The analytics query could not be generated.",
+                )
+            }
+        updates: dict[str, object] = {
+            "generated_query": generated_query,
+            "result": None,
+            "retryable": False,
+        }
+        if state.repair_error is not None:
+            updates["retry_count"] = state.retry_count + 1
+        return updates
+
+    def _execute_query(self, state: AnalyticsQueryState) -> dict[str, object]:
+        if state.result is not None:
+            return {}
+        generated_query = state.generated_query
+        if generated_query is None:
+            return {
+                "result": AnalyticsQueryResult(
+                    status=AnalyticsQueryStatus.EXECUTION_FAILURE,
+                    message="The analytics query could not be generated.",
+                )
+            }
         if not generated_query.supported:
-            return AnalyticsQueryResult(
-                status=AnalyticsQueryStatus.UNSUPPORTED,
-                message=generated_query.reason or "This request is not supported by the analytics data.",
-            )
+            return {
+                "result": AnalyticsQueryResult(
+                    status=AnalyticsQueryStatus.UNSUPPORTED,
+                    message=generated_query.reason
+                    or "This request is not supported by the analytics data.",
+                )
+            }
         if not generated_query.sql:
-            return AnalyticsQueryResult(
-                status=AnalyticsQueryStatus.EXECUTION_FAILURE,
-                message="The analytics query could not be generated.",
-            )
-        return self._stats_service.execute(generated_query.sql, generated_query.parameters)
+            return {
+                "result": AnalyticsQueryResult(
+                    status=AnalyticsQueryStatus.EXECUTION_FAILURE,
+                    message="The analytics query could not be generated.",
+                )
+            }
+        result = self._stats_service.execute(generated_query.sql, generated_query.parameters)
+        retryable = result.status is not AnalyticsQueryStatus.SUCCESS
+        if retryable and state.retry_count >= 1:
+            return {
+                "result": AnalyticsQueryResult(
+                    status=AnalyticsQueryStatus.EXECUTION_FAILURE,
+                    message="The analytics query could not be completed after a repair attempt.",
+                ),
+                "retryable": False,
+            }
+        updates: dict[str, object] = {"result": result, "retryable": retryable}
+        if retryable and state.retry_count < 1:
+            updates["repair_error"] = result.message or "The previous query could not run."
+        return updates
+
+    @staticmethod
+    def _next_step(state: AnalyticsQueryState) -> str:
+        if (
+            state.retryable
+            and state.retry_count < 1
+            and state.result is not None
+        ):
+            return "retry"
+        return "complete"
 
 
 def analytics_schema_description(bind: Engine | Connection) -> str:

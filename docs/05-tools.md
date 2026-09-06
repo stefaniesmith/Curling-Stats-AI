@@ -42,7 +42,8 @@ Avoiding overlapping responsibilities keeps the overall system easier to underst
 
 ### Stable Contracts
 
-Tools communicate with the agent through structured inputs and outputs rather than implementation-specific details.
+Tools communicate with the agent through Pydantic-validated structured inputs and
+outputs rather than implementation-specific details.
 
 The agent depends only on each tool's contract, allowing the internal implementation to change without affecting the rest of the application.
 
@@ -169,6 +170,13 @@ The Analytics Query Tool encapsulates the complete workflow required to fulfill 
 Its implementation includes query planning, validation, execution, and error handling. These implementation details remain internal to the tool and are intentionally hidden from the agent.
 
 This separation allows the internal implementation to evolve independently while preserving a stable interface.
+
+The current implementation invokes a two-node internal LangGraph from the
+agent layer, with Pydantic state: an LLM generation node produces a structured
+query, then a deterministic node validates and executes it. A validation or
+execution failure returns a sanitized error to the generation node for one
+repair attempt. A second failure is returned as an execution failure; a
+model-declared unsupported request does not retry.
 
 ---
 

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict
 
 from curlchat.core.names import normalize_name
 from curlchat.repositories.players import PlayerNameRecord, PlayerRepository
@@ -23,9 +24,10 @@ class PlayerResolutionStatus(StrEnum):
     NOT_FOUND = "not_found"
 
 
-@dataclass(frozen=True)
-class ResolvedPlayer:
+class ResolvedPlayer(BaseModel):
     """A canonical player candidate and the confidence of the name match."""
+
+    model_config = ConfigDict(frozen=True)
 
     player_id: int
     canonical_name: str
@@ -33,9 +35,10 @@ class ResolvedPlayer:
     matched_alias: bool
 
 
-@dataclass(frozen=True)
-class PlayerResolution:
+class PlayerResolution(BaseModel):
     """Structured result returned to the agent's player-resolver tool."""
+
+    model_config = ConfigDict(frozen=True)
 
     query: str
     status: PlayerResolutionStatus

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 from sqlglot import exp, parse
 from sqlglot.errors import ParseError
@@ -24,13 +24,12 @@ class AnalyticsQueryStatus(StrEnum):
     EXECUTION_FAILURE = "execution_failure"
 
 
-@dataclass(frozen=True)
-class AnalyticsQueryResult:
+class AnalyticsQueryResult(BaseModel):
     """Rows and metadata returned by one validated analytics query."""
 
     status: AnalyticsQueryStatus
-    columns: tuple[str, ...] = ()
-    rows: tuple[dict[str, Any], ...] = ()
+    columns: tuple[str, ...] = Field(default_factory=tuple)
+    rows: tuple[dict[str, Any], ...] = Field(default_factory=tuple)
     truncated: bool = False
     message: str | None = None
 

@@ -45,7 +45,7 @@ The agent is responsible for:
 * interpreting user requests
 * maintaining conversational context
 * determining which tools to invoke
-* generating SQL queries through the Analytics Query Tool
+* requesting analytical results through the Analytics Query Tool
 * requesting visualizations when appropriate
 * assembling the final response
 * streaming response blocks to the client
@@ -104,7 +104,9 @@ Its responsibilities include:
 * supporting streaming responses
 * enabling future graph expansion
 
-The graph represents the application's workflow rather than a collection of prompts. Each node has a well-defined responsibility and communicates through structured state.
+The graph represents the application's workflow rather than a collection of prompts.
+Each node has a well-defined responsibility and communicates through Pydantic
+state models.
 
 ---
 
@@ -143,8 +145,8 @@ Fulfills analytical data requests against the statistics database.
 The tool:
 
 * receives the user's analytical intent
-* generates PostgreSQL SQL
-* executes the query
+* invokes an internal two-node agent graph: SQL generation followed by validation and execution
+* retries SQL generation once with a sanitized validation or execution error when needed
 * returns structured results
 
 The tool only accesses the analytics schema.
