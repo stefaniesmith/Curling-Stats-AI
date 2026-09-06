@@ -1,9 +1,10 @@
-from curlchat.db.models import Event, Player, PlayerAlias, PlayerEventStatistics
+from curlchat.db.models import Conversation, Event, Player, PlayerAlias, PlayerEventStatistics
 from curlchat.db.session import Base
 
 
 def test_analytics_models_register_the_documented_tables() -> None:
     assert set(Base.metadata.tables) == {
+        "conversations",
         "players",
         "player_aliases",
         "events",
@@ -15,6 +16,16 @@ def test_analytics_tables_include_documentation_comments() -> None:
     for model in (Player, PlayerAlias, Event, PlayerEventStatistics):
         assert model.__table__.comment
         assert all(column.comment for column in model.__table__.columns)
+
+
+def test_conversation_metadata_has_no_message_column() -> None:
+    assert Conversation.__table__.comment
+    assert set(Conversation.__table__.columns.keys()) == {
+        "id",
+        "title",
+        "created_at",
+        "updated_at",
+    }
 
 
 def test_statistics_identity_is_unique_per_player_event_and_year() -> None:

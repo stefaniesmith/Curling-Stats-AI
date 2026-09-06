@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from openai import OpenAIError
@@ -89,6 +90,24 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     )
 
 
+def test_build_graph_adds_a_checkpointer_when_supplied(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(app_graph, "ChatOpenAI", lambda **_: "model")
+    monkeypatch.setattr(
+        app_graph, "create_react_agent", lambda **kwargs: captured.update(kwargs) or "graph"
+    )
+
+    checkpointer = object()
+    assert (
+        app_graph.build_graph(
+            Settings(openai_api_key=SecretStr("test-key")), checkpointer=checkpointer  # type: ignore[arg-type]
+        )
+        == "graph"
+    )
+    assert captured["checkpointer"] is checkpointer
+
+
 def test_respond_to_message_returns_final_text(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeGraph:
         def invoke(self, state: dict[str, object]) -> dict[str, object]:
@@ -99,6 +118,54 @@ def test_respond_to_message_returns_final_text(monkeypatch: pytest.MonkeyPatch) 
 
     assert app_graph.respond_to_message("Show Brier stats") == app_graph.AgentResponse(
         message="Here are the statistics."
+    )
+
+
+def test_respond_to_message_uses_conversation_id_as_langgraph_thread(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conversation_id = uuid4()
+    captured: dict[str, object] = {}
+
+    class FakeGraph:
+        def invoke(self, state: dict[str, object], config: dict[str, object]) -> dict[str, object]:
+            captured["state"] = state
+            captured["config"] = config
+            return {"messages": [SimpleNamespace(content="A persisted response.")]}
+
+    class FakeCheckpointerContext:
+        def __enter__(self) -> object:
+            return "checkpointer"
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        app_graph.PostgresSaver,
+        "from_conn_string",
+        lambda connection_string: captured.setdefault("connection_string", connection_string)
+        and FakeCheckpointerContext(),
+    )
+    monkeypatch.setattr(
+        app_graph,
+        "build_graph",
+        lambda settings=None, checkpointer=None: captured.setdefault("checkpointer", checkpointer)
+        and FakeGraph(),
+    )
+
+    response = app_graph.respond_to_message(
+        "Remember this", conversation_id, Settings(openai_api_key=SecretStr("test-key"))
+    )
+
+    assert response.message == "A persisted response."
+    assert captured["checkpointer"] == "checkpointer"
+    assert captured["config"] == {"configurable": {"thread_id": str(conversation_id)}}
+    assert captured["state"] == {"messages": [{"role": "user", "content": "Remember this"}]}
+
+
+def test_psycopg_url_removes_sqlalchemy_driver_suffix() -> None:
+    assert app_graph._psycopg_url("postgresql+psycopg://state:secret@localhost:5432/curlchat") == (
+        "postgresql://state:secret@localhost:5432/curlchat"
     )
 
 

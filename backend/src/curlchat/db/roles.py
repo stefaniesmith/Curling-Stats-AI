@@ -9,6 +9,13 @@ from sqlalchemy import Connection
 from sqlalchemy.engine import make_url
 
 _ANALYTICS_TABLES = ("players", "player_aliases", "events", "player_event_statistics")
+_STATE_TABLES = (
+    "conversations",
+    "checkpoint_migrations",
+    "checkpoints",
+    "checkpoint_blobs",
+    "checkpoint_writes",
+)
 
 
 @dataclass(frozen=True)
@@ -28,8 +35,8 @@ def application_role_from_url(database_url: str) -> ApplicationRole:
     return ApplicationRole(database_name=url.database, username=url.username, password=url.password)
 
 
-def provision_application_role(connection: Connection, database_url: str) -> ApplicationRole:
-    """Create or update a runtime role with read-only analytics access."""
+def _provision_login_role(connection: Connection, database_url: str) -> ApplicationRole:
+    """Create or update an unprivileged login role derived from a database URL."""
     application_role = application_role_from_url(database_url)
     dbapi_connection = connection.connection.driver_connection
     with dbapi_connection.cursor() as cursor:
@@ -57,17 +64,38 @@ def provision_application_role(connection: Connection, database_url: str) -> App
                 sql.Identifier(application_role.database_name), sql.Identifier(application_role.username)
             )
         )
-        cursor.execute(
-            sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(
-                sql.Identifier(application_role.username)
-            )
-        )
-        cursor.execute(
-            sql.SQL("GRANT SELECT ON TABLE {} TO {}").format(
-                sql.SQL(", ").join(
-                    sql.SQL("public.{}").format(sql.Identifier(table)) for table in _ANALYTICS_TABLES
-                ),
-                sql.Identifier(application_role.username),
-            )
-        )
     return application_role
+
+
+def _grant_table_privileges(
+    connection: Connection, role: ApplicationRole, tables: tuple[str, ...], privileges: str
+) -> None:
+    """Grant an explicit table set without broad schema-wide defaults."""
+    dbapi_connection = connection.connection.driver_connection
+    with dbapi_connection.cursor() as cursor:
+        cursor.execute(
+            sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(role.username))
+        )
+        cursor.execute(
+            sql.SQL("GRANT {} ON TABLE {} TO {}").format(
+                sql.SQL(privileges),
+                sql.SQL(", ").join(
+                    sql.SQL("public.{}").format(sql.Identifier(table)) for table in tables
+                ),
+                sql.Identifier(role.username),
+            )
+        )
+
+
+def provision_application_role(connection: Connection, database_url: str) -> ApplicationRole:
+    """Create/update the read-only analytics runtime role."""
+    role = _provision_login_role(connection, database_url)
+    _grant_table_privileges(connection, role, _ANALYTICS_TABLES, "SELECT")
+    return role
+
+
+def provision_state_role(connection: Connection, database_url: str) -> ApplicationRole:
+    """Create/update the conversation-state role with no analytics privileges."""
+    role = _provision_login_role(connection, database_url)
+    _grant_table_privileges(connection, role, _STATE_TABLES, "SELECT, INSERT, UPDATE, DELETE")
+    return role

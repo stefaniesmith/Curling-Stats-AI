@@ -11,12 +11,20 @@ from curlchat.db.models import Event, Player, PlayerAlias, PlayerEventStatistics
 from curlchat.db.session import Base, get_settings
 
 config = context.config
+_LANGGRAPH_CHECKPOINT_TABLES = frozenset(
+    {"checkpoint_migrations", "checkpoints", "checkpoint_blobs", "checkpoint_writes"}
+)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 config.set_main_option("sqlalchemy.url", get_settings().admin_database_url)
 target_metadata = Base.metadata
+
+
+def include_object(object_: object, name: str | None, type_: str, *_: object) -> bool:
+    """Keep LangGraph-managed checkpoint tables out of ORM autogeneration."""
+    return not (type_ == "table" and name in _LANGGRAPH_CHECKPOINT_TABLES)
 
 
 def run_migrations_offline() -> None:
@@ -27,6 +35,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -42,7 +51,12 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            include_object=include_object,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
@@ -8,10 +10,10 @@ class ResponseBlock(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    conversation_id: str | None = None
+    conversation_id: UUID | None = None
 
 
 class ChatResponse(BaseModel):
-    conversation_id: str | None = None
+    conversation_id: UUID
     message: str
     blocks: list[ResponseBlock] = Field(default_factory=list)

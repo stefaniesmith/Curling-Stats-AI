@@ -355,6 +355,26 @@ It identifies:
 
 A single identifier is used across the entire application to simplify state management.
 
+Conversation metadata is stored in the `conversations` table. It contains a
+deterministic title and timestamps, but never duplicates user or assistant
+messages. LangGraph's PostgreSQL checkpointer stores message history and graph
+state under the same ID as its `thread_id`.
+
+The backend creates a conversation on the first `POST /api/chat` request when
+the client omits `conversation_id`. Later requests must send that returned ID;
+unknown IDs return `404` rather than creating an untracked LangGraph thread.
+`GET /api/conversations` lists metadata for the conversation sidebar.
+
+Two restricted runtime database connections enforce the boundary:
+
+* `curlchat_app` is read-only and can access only analytics tables.
+* `curlchat_state` can read and write only `conversations` and LangGraph
+  checkpoint tables.
+
+The owner role, `curlchat_owner`, owns these tables and runs migrations. This
+means LLM-generated analytics SQL cannot read or modify conversations even if
+an application-level validation boundary were to fail.
+
 ---
 
 # Visualization Architecture

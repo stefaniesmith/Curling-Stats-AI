@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from typing import Any
+from uuid import UUID
 
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.prebuilt import create_react_agent
 from openai import OpenAIError
 from pydantic import BaseModel, Field, ValidationError
+from sqlalchemy.engine import make_url
 
 from curlchat.agent.tools.analytics_query import query_analytics
 from curlchat.agent.tools.event_resolver import resolve_event
@@ -66,7 +71,9 @@ class AgentResponse(BaseModel):
     artifacts: tuple[VisualizationArtifact, ...] = Field(default_factory=tuple)
 
 
-def build_graph(settings: Settings | None = None) -> Any:
+def build_graph(
+    settings: Settings | None = None, checkpointer: BaseCheckpointSaver | None = None
+) -> Any:
     """Build the tool-using graph without contacting the model provider."""
     configured_settings = settings or get_settings()
     if configured_settings.openai_api_key is None:
@@ -77,18 +84,43 @@ def build_graph(settings: Settings | None = None) -> Any:
         temperature=0,
         max_completion_tokens=800,
     )
-    return create_react_agent(
-        model=model,
-        tools=[resolve_player, resolve_event, query_analytics, create_visualization],
-        prompt=SYSTEM_PROMPT,
+    graph_arguments: dict[str, Any] = {
+        "model": model,
+        "tools": [resolve_player, resolve_event, query_analytics, create_visualization],
+        "prompt": SYSTEM_PROMPT,
+    }
+    if checkpointer is not None:
+        graph_arguments["checkpointer"] = checkpointer
+    return create_react_agent(**graph_arguments)
+
+
+def respond_to_message(
+    message: str, conversation_id: UUID | None = None, settings: Settings | None = None
+) -> AgentResponse:
+    """Run a message, optionally persisting its history under one conversation ID."""
+    configured_settings = settings or get_settings()
+    checkpointer_context = (
+        PostgresSaver.from_conn_string(_psycopg_url(configured_settings.state_database_url))
+        if conversation_id is not None
+        else nullcontext(None)
     )
-
-
-def respond_to_message(message: str, settings: Settings | None = None) -> AgentResponse:
-    """Run one user message through the graph and return text plus created artifacts."""
-    graph = build_graph(settings)
     try:
-        state = graph.invoke({"messages": [{"role": "user", "content": message}]})
+        with checkpointer_context as checkpointer:
+            graph = (
+                build_graph(configured_settings, checkpointer=checkpointer)
+                if conversation_id is not None
+                else build_graph(configured_settings)
+            )
+            invocation_arguments: dict[str, Any] = {
+                "messages": [{"role": "user", "content": message}]
+            }
+            if conversation_id is not None:
+                state = graph.invoke(
+                    invocation_arguments,
+                    config={"configurable": {"thread_id": str(conversation_id)}},
+                )
+            else:
+                state = graph.invoke(invocation_arguments)
     except OpenAIError as error:
         raise AgentInvocationError("The model provider could not complete the request.") from error
     messages = state["messages"]
@@ -96,6 +128,11 @@ def respond_to_message(message: str, settings: Settings | None = None) -> AgentR
         message=_message_text(messages[-1].content),
         artifacts=_visualization_artifacts(messages),
     )
+
+
+def _psycopg_url(database_url: str) -> str:
+    """Convert SQLAlchemy's psycopg URL form to the driver's connection URL."""
+    return make_url(database_url).set(drivername="postgresql").render_as_string(hide_password=False)
 
 
 def _visualization_artifacts(messages: list[Any]) -> tuple[VisualizationArtifact, ...]:

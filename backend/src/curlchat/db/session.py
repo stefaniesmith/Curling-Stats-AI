@@ -8,6 +8,9 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://curlchat_app:curlchat_app@localhost:5432/curlchat"
+    state_database_url: str = (
+        "postgresql+psycopg://curlchat_state:curlchat_state@localhost:5432/curlchat"
+    )
     admin_database_url: str = "postgresql+psycopg://curlchat_owner:curlchat@localhost:5432/curlchat"
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-4.1-mini"
@@ -33,6 +36,11 @@ def get_settings() -> Settings:
 
 engine = create_engine(get_settings().database_url, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+state_engine = create_engine(get_settings().state_database_url, future=True)
+StateSessionLocal = sessionmaker(
+    bind=state_engine, autoflush=False, autocommit=False, expire_on_commit=False
+)
 
 admin_engine = create_engine(get_settings().admin_database_url, future=True)
 AdminSessionLocal = sessionmaker(

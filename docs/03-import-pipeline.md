@@ -67,8 +67,10 @@ uv run python -m curlchat.ingest.cli --source /path/to/curling-canada-stats-arch
 The command runs the import in one database transaction. A validation failure
 therefore prevents a partial import from being committed.
 
-For a fresh local database, apply the schema migration and provision the
-read-only application role before importing:
+For a fresh local database, apply the schema migration and provision both
+restricted runtime roles before importing. `curlchat_app` is read-only for
+analytics; `curlchat_state` is reserved for conversation metadata and
+LangGraph checkpoints:
 
 ```bash
 uv run alembic upgrade head

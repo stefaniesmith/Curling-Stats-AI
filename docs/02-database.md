@@ -38,6 +38,19 @@ The analytics database consists of four primary tables.
 
 Conversation history and LangGraph persistence are stored separately and are not considered part of the analytics schema.
 
+The application-state tables are:
+
+| Table | Purpose |
+| --- | --- |
+| `conversations` | Application metadata: one ID, title, and timestamps per conversation. |
+| `checkpoint_migrations`, `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` | LangGraph-managed persisted graph state and message history. |
+
+`conversations` deliberately does not contain messages. The shared UUID is the
+application conversation ID and the LangGraph `thread_id`, preventing duplicate
+message storage. The pinned LangGraph checkpointer package owns the checkpoint
+table format; its current tables are created by the conversation migration and
+excluded from SQLAlchemy/Alembic autogeneration.
+
 ---
 
 ## Table Descriptions
@@ -260,6 +273,21 @@ The agent is expected to query only the analytics tables:
 Player aliases are resolved before SQL generation, so the agent never queries `player_aliases`.
 
 Conversation history, LangGraph persistence, and other application tables are not exposed to the SQL agent.
+
+## Runtime Database Roles
+
+`curlchat_owner` owns all tables and runs Alembic migrations. The backend uses
+two least-privilege runtime roles provisioned after migration:
+
+* `curlchat_app` has `SELECT` only on analytics tables. The Player Resolver
+  uses its alias access internally; the Analytics Query Tool's validator still
+  excludes `player_aliases` from generated SQL.
+* `curlchat_state` has `SELECT`, `INSERT`, `UPDATE`, and `DELETE` only on
+  `conversations` and the LangGraph checkpoint tables.
+
+The roles do not have access to one another's table set. This preserves the
+read-only analytics defense-in-depth boundary while allowing conversation state
+to persist.
 
 ---
 

@@ -8,7 +8,8 @@ Planned implementation order:
 2. Player resolver service
 3. Stats service
 4. LangGraph tool wrappers
-5. Streaming chat endpoint
+5. Conversation persistence
+6. Streaming chat endpoint
 
 Suggested local commands after dependencies are installed:
 
@@ -20,5 +21,6 @@ Suggested local commands after dependencies are installed:
 - `uv run pytest`
 
 `ADMIN_DATABASE_URL` uses `curlchat_owner` for Alembic and archive import.
-`DATABASE_URL` uses the `curlchat_app` runtime role. Provisioning grants that
-role `SELECT` access to the four application tables only.
+`DATABASE_URL` uses the `curlchat_app` runtime role, which has `SELECT` access
+to the analytics tables only. `STATE_DATABASE_URL` uses `curlchat_state`, which
+can access conversation metadata and LangGraph checkpoint tables only.
