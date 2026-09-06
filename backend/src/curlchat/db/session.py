@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     admin_database_url: str = "postgresql+psycopg://curlchat_owner:curlchat@localhost:5432/curlchat"
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-4.1-mini"
+    phoenix_tracing_enabled: bool = False
+    phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
+    phoenix_project_name: str = "curlchat"
 
     model_config = SettingsConfigDict(
         env_file=".env",

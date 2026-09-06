@@ -17,5 +17,18 @@ services:
       timeout: 5s
       retries: 5
 
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: curlchat-phoenix
+    restart: unless-stopped
+    ports:
+      - "${PHOENIX_PORT:-6006}:6006"
+      - "${PHOENIX_GRPC_PORT:-4317}:4317"
+    environment:
+      PHOENIX_WORKING_DIR: /mnt/data
+    volumes:
+      - phoenix_data:/mnt/data
+
 volumes:
   postgres_data:
+  phoenix_data:
