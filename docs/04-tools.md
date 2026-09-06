@@ -174,6 +174,12 @@ The Analytics Query Tool operates using a read-only database connection.
 
 Database access is limited to the analytics schema, and all requests are validated before execution to prevent unsafe operations.
 
+The initial implementation parses each query, permits exactly one read-only
+`SELECT` statement, restricts table references to `players`, `events`, and
+`player_event_statistics`, binds query parameters separately, and caps returned
+rows. The production database role must also remain read-only as defense in
+depth.
+
 ---
 
 ## Visualization Tool

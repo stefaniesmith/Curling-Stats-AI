@@ -175,7 +175,7 @@ Examples include:
 
 * one canonical player per normalized name
 * one alias per player/name combination
-* one statistics record per player, event, and event year
+* one statistics record per player, event, event year, team code, and position
 
 ---
 
