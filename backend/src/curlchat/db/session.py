@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -8,6 +9,8 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://curlchat_app:curlchat_app@localhost:5432/curlchat"
     admin_database_url: str = "postgresql+psycopg://curlchat_owner:curlchat@localhost:5432/curlchat"
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-4.1-mini"
 
     model_config = SettingsConfigDict(
         env_file=".env",

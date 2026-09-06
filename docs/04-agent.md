@@ -1,4 +1,4 @@
-# 03 - Agent
+# 04 - Agent
 
 ## Overview
 
@@ -8,7 +8,20 @@ The agent is responsible for understanding user intent, orchestrating the approp
 
 Rather than embedding business logic inside the language model, CurlChat follows a tool-based architecture. The LLM acts as an orchestrator, while application services perform deterministic work such as player resolution, SQL execution, and chart generation.
 
-The agent is implemented using LangGraph, providing explicit workflow orchestration, conversation persistence, and streaming execution.
+The agent is implemented using LangGraph, providing explicit workflow orchestration and a path to later conversation persistence and streaming execution.
+
+---
+
+## Initial Implementation
+
+The first implemented graph uses a configurable OpenAI chat model and exposes
+two tools: Player Resolver and Analytics Query. It is stateless and returns a
+single Markdown response through the chat endpoint. The model is instructed to
+resolve player identities before querying statistics, and it has no direct
+database access or SQL-generation responsibility.
+
+Conversation persistence, streaming, and visualization selection remain later
+implementation steps.
 
 ---
 

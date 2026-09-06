@@ -1,4 +1,4 @@
-# 04 - Tools
+# 05 - Tools
 
 ## Overview
 
@@ -19,6 +19,10 @@ Visualization Tool
 ```
 
 Each tool is designed to operate independently and can evolve without requiring significant changes to the agent itself.
+
+The initial LangGraph implementation exposes the Player Resolver and Analytics
+Query Tool. The Visualization Tool remains part of the documented architecture
+but is not yet wired into the graph.
 
 ---
 
@@ -140,7 +144,7 @@ It acts as the boundary between the conversational agent and the analytics datab
 ### Inputs
 
 * analytical request
-* resolved player identifiers
+* resolved player identity pairs (`display_name` and `player_id`)
 * resolved event identifiers
 * analytics schema description
 
@@ -179,6 +183,14 @@ The initial implementation parses each query, permits exactly one read-only
 `player_event_statistics`, binds query parameters separately, and caps returned
 rows. The production database role must also remain read-only as defense in
 depth.
+
+The agent-facing contract accepts an analytical request and resolved player
+identity pairs (`display_name` and `player_id`), not SQL. Keeping each name
+paired with its ID means comparison requests retain the exact identity mapping
+through SQL generation. Event identifiers will join the contract when an Event
+Resolver exists. Internally, the tool supplies a separate SQL-generation model
+with a schema description inspected from the live analytics database, then
+validates and executes the generated query.
 
 ---
 
