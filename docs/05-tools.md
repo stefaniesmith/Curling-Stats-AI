@@ -6,10 +6,13 @@ The CurlChat agent delegates specialized work to a small set of tools. Each tool
 
 This separation allows the agent to focus on understanding user intent and orchestrating workflows, while individual tools encapsulate domain-specific logic.
 
-The current architecture consists of three primary tools:
+The current architecture consists of four primary tools:
 
 ```text
 Player Resolver
+        │
+        ▼
+Event Resolver
         │
         ▼
 Analytics Query Tool
@@ -20,9 +23,9 @@ Visualization Tool
 
 Each tool is designed to operate independently and can evolve without requiring significant changes to the agent itself.
 
-The initial LangGraph implementation exposes the Player Resolver and Analytics
-Query Tool. The Visualization Tool remains part of the documented architecture
-but is not yet wired into the graph.
+The initial LangGraph implementation exposes the Player Resolver, Event
+Resolver, and Analytics Query Tool. The Visualization Tool remains part of the
+documented architecture but is not yet wired into the graph.
 
 ---
 
@@ -123,6 +126,34 @@ It does not generate analytical queries or access player statistics.
 
 ---
 
+## Event Resolver
+
+### Purpose
+
+The Event Resolver converts a named competition into a canonical event identity
+used by the Analytics Query Tool.
+
+### Responsibilities
+
+* match an exact event display name or source slug
+* match clear event shorthand or spelling variations
+* return ambiguity rather than silently combining distinct competitions
+
+### Inputs
+
+* event names extracted from the user's request; a year in the phrase is ignored
+
+### Outputs
+
+* canonical event identity pairs (`display_name` and `event_id`)
+* ambiguous event candidates when clarification is required
+
+For example, “Canada Cup” produces the distinct men's and women's event
+candidates as an ambiguous result. The agent must ask the user to choose, or
+explicitly resolve both events if the user asks for both.
+
+---
+
 ## Analytics Query Tool
 
 ### Purpose
@@ -146,7 +177,7 @@ It acts as the boundary between the conversational agent and the analytics datab
 
 * analytical request
 * resolved player identity pairs (`display_name` and `player_id`)
-* resolved event identifiers
+* resolved event identity pairs (`display_name` and `event_id`)
 * analytics schema description
 
 ---
@@ -244,7 +275,8 @@ Each tool exposes a stable contract to the LangGraph agent.
 
 | Tool                 | Input              | Output                       |
 | -------------------- | ------------------ | ---------------------------- |
-| Player Resolver      | Player names       | Canonical player identifiers |
+| Player Resolver      | Player names       | Canonical player identities  |
+| Event Resolver       | Event names        | Canonical event identities   |
 | Analytics Query Tool | Analytical request | Structured query results     |
 | Visualization Tool   | Query results      | Visualization artifacts      |
 

@@ -15,7 +15,7 @@ The agent is implemented using LangGraph, providing explicit workflow orchestrat
 ## Initial Implementation
 
 The first implemented graph uses a configurable OpenAI chat model and exposes
-two tools: Player Resolver and Analytics Query. It is stateless and returns a
+three tools: Player Resolver, Event Resolver, and Analytics Query. It is stateless and returns a
 single Markdown response through the chat endpoint. The model is instructed to
 resolve player identities before querying statistics, and it has no direct
 database access or SQL-generation responsibility.
@@ -74,7 +74,9 @@ LangGraph Agent
     │
     ├── Player Resolver
     │
-    ├── Analytics Query Tool
+        ├── Event Resolver
+        │
+        ├── Analytics Query Tool
     │
     ├── Visualization Tool (optional)
     │
@@ -152,6 +154,17 @@ The tool:
 The tool only accesses the analytics schema.
 
 It does not perform player alias resolution or business logic.
+
+---
+
+### Event Resolver
+
+Resolves a named competition before analytics query generation.
+
+The resolver returns one canonical event identity pair (`display_name` and
+`event_id`) when matching is unambiguous. For shorthand such as “Canada Cup”
+that matches distinct men's and women's events, it returns the candidates as
+ambiguous and the main agent asks the user to clarify.
 
 ---
 

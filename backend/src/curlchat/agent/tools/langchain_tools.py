@@ -10,12 +10,15 @@ from pydantic import BaseModel, Field
 from curlchat.agent.graph.analytics_query_graph import (
     AnalyticsQueryWorkflow,
     OpenAISqlGenerator,
+    ResolvedEventIdentity,
     ResolvedPlayerIdentity,
     analytics_schema_description,
 )
+from curlchat.agent.tools.event_resolver import resolve_event_name
 from curlchat.agent.tools.player_resolver import resolve_player_name
 from curlchat.db.session import SessionLocal, get_settings
 from curlchat.repositories.analytics import AnalyticsRepository
+from curlchat.services.event_resolver import EventResolutionStatus
 from curlchat.services.player_resolver import PlayerResolutionStatus
 from curlchat.services.stats_service import AnalyticsQueryResult, AnalyticsQueryStatus, StatsService
 
@@ -35,6 +38,22 @@ class PlayerResolutionToolResult(BaseModel):
     query: str
     status: PlayerResolutionStatus
     matches: tuple[ResolvedPlayerMatch, ...] = Field(default_factory=tuple)
+
+
+class ResolvedEventMatch(BaseModel):
+    """One event candidate exposed by the Event Resolver tool."""
+
+    event_id: int
+    display_name: str
+    confidence: float
+
+
+class EventResolutionToolResult(BaseModel):
+    """Structured output returned by the Event Resolver tool."""
+
+    query: str
+    status: EventResolutionStatus
+    matches: tuple[ResolvedEventMatch, ...] = Field(default_factory=tuple)
 
 
 class AnalyticsQueryToolResult(BaseModel):
@@ -83,6 +102,30 @@ def resolve_player(
 
 
 @tool
+def resolve_event(
+    name: Annotated[
+        str,
+        Field(description="The event name exactly as the user expressed it, including shorthand. Omit years."),
+    ],
+) -> str:
+    """Resolve an event name before asking a question about event statistics."""
+    with SessionLocal() as session:
+        resolution = resolve_event_name(session, name)
+    return EventResolutionToolResult(
+        query=resolution.query,
+        status=resolution.status,
+        matches=tuple(
+            ResolvedEventMatch(
+                event_id=match.event_id,
+                display_name=match.display_name,
+                confidence=match.confidence,
+            )
+            for match in resolution.matches
+        ),
+    ).model_dump_json()
+
+
+@tool
 def query_analytics(
     request: Annotated[
         str,
@@ -94,6 +137,15 @@ def query_analytics(
             description=(
                 "Successful Player Resolver results only. Each display_name/player_id pair "
                 "preserves the identity mapping for this request."
+            )
+        ),
+    ] = None,
+    resolved_events: Annotated[
+        list[ResolvedEventIdentity] | None,
+        Field(
+            description=(
+                "Successful Event Resolver results only. Each display_name/event_id pair "
+                "preserves the event identity for this request."
             )
         ),
     ] = None,
@@ -109,5 +161,5 @@ def query_analytics(
             stats_service,
             OpenAISqlGenerator(get_settings(), analytics_schema_description(session.get_bind())),
         )
-        result = workflow.query(request, resolved_players or ())
+        result = workflow.query(request, resolved_players or (), resolved_events or ())
     return AnalyticsQueryToolResult.from_service_result(result).model_dump_json()

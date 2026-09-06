@@ -35,6 +35,13 @@ class ResolvedPlayerIdentity(BaseModel):
     player_id: int = Field(description="The resolved player's database identifier.")
 
 
+class ResolvedEventIdentity(BaseModel):
+    """An event identity passed between the resolver and analytics boundaries."""
+
+    display_name: str = Field(description="The resolved event's display name.")
+    event_id: int = Field(description="The resolved event's database identifier.")
+
+
 class AnalyticsQueryState(BaseModel):
     """Pydantic state shared by the Analytics Query Tool's internal graph."""
 
@@ -42,7 +49,7 @@ class AnalyticsQueryState(BaseModel):
 
     request: str
     resolved_players: tuple[ResolvedPlayerIdentity, ...] = Field(default_factory=tuple)
-    event_ids: tuple[int, ...] = Field(default_factory=tuple)
+    resolved_events: tuple[ResolvedEventIdentity, ...] = Field(default_factory=tuple)
     generated_query: GeneratedAnalyticsQuery | None = None
     result: AnalyticsQueryResult | None = None
     retry_count: int = 0
@@ -57,7 +64,7 @@ class SqlGenerator(Protocol):
         self,
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity],
-        event_ids: Sequence[int],
+        resolved_events: Sequence[ResolvedEventIdentity],
         repair_error: str | None = None,
     ) -> GeneratedAnalyticsQuery: ...
 
@@ -80,7 +87,7 @@ class OpenAISqlGenerator:
         self,
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity],
-        event_ids: Sequence[int],
+        resolved_events: Sequence[ResolvedEventIdentity],
         repair_error: str | None = None,
     ) -> GeneratedAnalyticsQuery:
         result = self._model.invoke(
@@ -93,7 +100,9 @@ class OpenAISqlGenerator:
                             "resolved_players": [
                                 player.model_dump() for player in resolved_players
                             ],
-                            "resolved_event_ids": list(event_ids),
+                            "resolved_events": [
+                                event.model_dump() for event in resolved_events
+                            ],
                             "previous_execution_error": repair_error,
                         }
                     )
@@ -117,7 +126,7 @@ class AnalyticsQueryWorkflow:
         self,
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity] = (),
-        event_ids: Sequence[int] = (),
+        resolved_events: Sequence[ResolvedEventIdentity] = (),
     ) -> AnalyticsQueryResult:
         """Fulfill an analytical request without exposing SQL to the main agent."""
         final_state = AnalyticsQueryState.model_validate(
@@ -125,7 +134,7 @@ class AnalyticsQueryWorkflow:
                 AnalyticsQueryState(
                     request=request,
                     resolved_players=tuple(resolved_players),
-                    event_ids=tuple(event_ids),
+                    resolved_events=tuple(resolved_events),
                 ).model_dump()
             )
         )
@@ -152,7 +161,7 @@ class AnalyticsQueryWorkflow:
             generated_query = self._sql_generator.generate(
                 state.request,
                 state.resolved_players,
-                state.event_ids,
+                state.resolved_events,
                 state.repair_error,
             )
         except (OpenAIError, TypeError, ValueError):
@@ -244,10 +253,8 @@ or query tables outside this schema:
 {schema_description}
 
 Join player_event_statistics.player_id to players.id and
-player_event_statistics.event_id to events.id. Use supplied resolved player or event
-IDs as SQLAlchemy-style named bound parameters whenever they constrain the request,
-for example `p.id = :player_id` with `{{ "player_id": 123 }}`. Never use PostgreSQL
-positional placeholders such as `$1`. If the request names an event and no resolved
-event ID is supplied, join `events` and filter its display_name with a named parameter.
-Do not invent columns.
+player_event_statistics.event_id to events.id. Resolved player and event identity
+pairs in the request are authoritative. Use their IDs as SQLAlchemy-style named bound parameters whenever they constrain the request, for example `p.id = :player_id` with
+`{{ "player_id": 123 }}`. Never use PostgreSQL positional placeholders such as `$1`.
+Never resolve event names yourself or invent columns.
 """

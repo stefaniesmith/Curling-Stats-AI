@@ -42,15 +42,17 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     }
     assert captured["graph"] == {
         "model": "model",
-        "tools": [app_graph.resolve_player, app_graph.query_analytics],
+        "tools": [app_graph.resolve_player, app_graph.resolve_event, app_graph.query_analytics],
         "prompt": app_graph.SYSTEM_PROMPT,
     }
     query_schema = app_graph.query_analytics.args_schema.model_json_schema()
     resolver_schema = app_graph.resolve_player.args_schema.model_json_schema()
+    event_resolver_schema = app_graph.resolve_event.args_schema.model_json_schema()
     assert "sql" not in query_schema["properties"]
-    assert set(query_schema["properties"]) == {"request", "resolved_players"}
+    assert set(query_schema["properties"]) == {"request", "resolved_players", "resolved_events"}
     assert "display_name" in str(query_schema)
     assert "player_id" in str(query_schema)
+    assert "event_id" in str(query_schema)
     assert resolver_schema["properties"]["name"]["description"] == (
         "The player name exactly as the user expressed it, including an alias or misspelling."
     )
@@ -60,7 +62,13 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert "Successful Player Resolver results only" in query_schema["properties"]["resolved_players"][
         "description"
     ]
-    assert "never generate, request, or\nexpose SQL" in app_graph.SYSTEM_PROMPT
+    assert event_resolver_schema["properties"]["name"]["description"] == (
+        "The event name exactly as the user expressed it, including shorthand. Omit years."
+    )
+    assert "Successful Event Resolver results only" in query_schema["properties"]["resolved_events"][
+        "description"
+    ]
+    assert "never generate, request, or expose SQL" in app_graph.SYSTEM_PROMPT.replace("\n", " ")
 
 
 def test_respond_to_message_returns_final_text(monkeypatch: pytest.MonkeyPatch) -> None:

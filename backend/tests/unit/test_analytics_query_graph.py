@@ -7,6 +7,7 @@ from curlchat.agent.graph.analytics_query_graph import (
     AnalyticsQueryWorkflow,
     GeneratedAnalyticsQuery,
     OpenAISqlGenerator,
+    ResolvedEventIdentity,
     ResolvedPlayerIdentity,
     SqlGenerator,
     analytics_schema_description,
@@ -21,32 +22,46 @@ from curlchat.services.stats_service import AnalyticsQueryStatus, StatsService
 class StaticGenerator:
     def __init__(self, result: GeneratedAnalyticsQuery) -> None:
         self.result = result
-        self.calls: list[tuple[str, tuple[ResolvedPlayerIdentity, ...], tuple[int, ...], str | None]] = []
+        self.calls: list[
+            tuple[
+                str,
+                tuple[ResolvedPlayerIdentity, ...],
+                tuple[ResolvedEventIdentity, ...],
+                str | None,
+            ]
+        ] = []
 
     def generate(
         self,
         request: str,
         resolved_players: tuple[ResolvedPlayerIdentity, ...],
-        event_ids: tuple[int, ...],
+        resolved_events: tuple[ResolvedEventIdentity, ...],
         repair_error: str | None = None,
     ) -> GeneratedAnalyticsQuery:
-        self.calls.append((request, resolved_players, event_ids, repair_error))
+        self.calls.append((request, resolved_players, resolved_events, repair_error))
         return self.result
 
 
 class SequenceGenerator:
     def __init__(self, results: list[GeneratedAnalyticsQuery]) -> None:
         self._results = results
-        self.calls: list[tuple[str, tuple[ResolvedPlayerIdentity, ...], tuple[int, ...], str | None]] = []
+        self.calls: list[
+            tuple[
+                str,
+                tuple[ResolvedPlayerIdentity, ...],
+                tuple[ResolvedEventIdentity, ...],
+                str | None,
+            ]
+        ] = []
 
     def generate(
         self,
         request: str,
         resolved_players: tuple[ResolvedPlayerIdentity, ...],
-        event_ids: tuple[int, ...],
+        resolved_events: tuple[ResolvedEventIdentity, ...],
         repair_error: str | None = None,
     ) -> GeneratedAnalyticsQuery:
-        self.calls.append((request, resolved_players, event_ids, repair_error))
+        self.calls.append((request, resolved_players, resolved_events, repair_error))
         return self._results.pop(0)
 
 
@@ -97,6 +112,16 @@ def test_preserves_each_resolved_player_name_and_id_for_comparisons() -> None:
     assert generator.calls == [
         ("Which years did Jennifer Jones have a better record?", players, (), None)
     ]
+
+
+def test_preserves_each_resolved_event_name_and_id() -> None:
+    generator = StaticGenerator(GeneratedAnalyticsQuery(supported=False, reason="Not needed."))
+    workflow = _workflow(generator)
+    event = ResolvedEventIdentity(display_name="Brier", event_id=2)
+
+    workflow.query("Show Brier statistics", resolved_events=(event,))
+
+    assert generator.calls == [("Show Brier statistics", (), (event,), None)]
 
 
 def test_retries_once_after_execution_failure_with_sanitized_error() -> None:
