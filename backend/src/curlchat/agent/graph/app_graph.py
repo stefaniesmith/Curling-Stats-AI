@@ -8,7 +8,9 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from openai import OpenAIError
 
-from curlchat.agent.tools.langchain_tools import query_analytics, resolve_event, resolve_player
+from curlchat.agent.tools.analytics_query import query_analytics
+from curlchat.agent.tools.event_resolver import resolve_event
+from curlchat.agent.tools.player_resolver import resolve_player
 from curlchat.db.session import Settings, get_settings
 
 SYSTEM_PROMPT = """You are CurlChat, a careful assistant for Curling Canada player statistics.
