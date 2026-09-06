@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-import logoUrl from "../../../CurlChatLogo.png";
+import logoUrl from "../../../assets/CurlChatLogo.png";
 import { ApiError, listConversations, sendMessage } from "../lib/api";
 import { ResponseBlocks } from "../features/visualizations/ResponseBlocks";
 import type { Conversation, ResponseBlock } from "../types/api";
