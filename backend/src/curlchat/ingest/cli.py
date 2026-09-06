@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from curlchat.db.session import SessionLocal
+from curlchat.db.session import AdminSessionLocal
 from curlchat.ingest.archive import ArchiveImportError, import_archive
 
 
@@ -17,7 +17,7 @@ def main() -> None:
     arguments = parser.parse_args()
 
     try:
-        with SessionLocal.begin() as session:
+        with AdminSessionLocal.begin() as session:
             report = import_archive(session, arguments.source)
     except ArchiveImportError as error:
         raise SystemExit(f"Import failed: {error}") from error

@@ -8,5 +8,5 @@ Run migrations from the `backend` directory:
 uv run alembic upgrade head
 ```
 
-Alembic reads `DATABASE_URL` through `curlchat.db.session.Settings`. The initial
+Alembic reads `ADMIN_DATABASE_URL` through `curlchat.db.session.Settings`. The initial
 revision creates the four documented analytics tables and their PostgreSQL comments.

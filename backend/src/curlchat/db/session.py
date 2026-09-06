@@ -6,7 +6,8 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://curlchat:curlchat@localhost:5432/curlchat"
+    database_url: str = "postgresql+psycopg://curlchat_app:curlchat_app@localhost:5432/curlchat"
+    admin_database_url: str = "postgresql+psycopg://curlchat_owner:curlchat@localhost:5432/curlchat"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -26,3 +27,8 @@ def get_settings() -> Settings:
 
 engine = create_engine(get_settings().database_url, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+admin_engine = create_engine(get_settings().admin_database_url, future=True)
+AdminSessionLocal = sessionmaker(
+    bind=admin_engine, autoflush=False, autocommit=False, expire_on_commit=False
+)
