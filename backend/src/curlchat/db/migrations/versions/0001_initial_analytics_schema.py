@@ -185,14 +185,14 @@ def upgrade() -> None:
         sa.Column(
             "team",
             sa.String(length=100),
-            nullable=True,
-            comment="Archive team code for this event year.",
+            nullable=False,
+            comment="Archive team code for this player stint.",
         ),
         sa.Column(
             "position",
             sa.String(length=50),
-            nullable=True,
-            comment="Archive player position for this event year.",
+            nullable=False,
+            comment="Archive player position for this player stint.",
         ),
         sa.Column(
             "alternate",
@@ -217,9 +217,11 @@ def upgrade() -> None:
             "player_id",
             "event_id",
             "event_year",
+            "team",
+            "position",
             name="uq_player_event_statistics_player_event_year",
         ),
-        comment="Archive yearly player statistics; career totals are calculated from these rows.",
+        comment="Archive player stints; yearly and career totals are calculated from these rows.",
     )
     op.create_index(
         "ix_player_event_statistics_event_year",

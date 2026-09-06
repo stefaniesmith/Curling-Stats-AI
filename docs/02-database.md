@@ -34,7 +34,7 @@ The analytics database consists of four primary tables.
 | `players`                 | Canonical player records.                          |
 | `player_aliases`          | Alternate names that resolve to canonical players. |
 | `events`                  | Supported Curling Canada competitions.             |
-| `player_event_statistics` | One row per player, event, and event year.         |
+| `player_event_statistics` | One row per player stint within an event year.     |
 
 Conversation history and LangGraph persistence are stored separately and are not considered part of the analytics schema.
 
@@ -100,7 +100,7 @@ Historical relationships between competitions are intentionally outside the scop
 
 ### player_event_statistics
 
-Stores one row per player, event, and event year.
+Stores one row per player, event, event year, team, and position.
 
 This is the central analytics table used by nearly every query in the application.
 
@@ -112,7 +112,7 @@ Each row contains:
 * team code
 * position
 * alternate designation
-* win/loss record
+* games, wins, and losses
 * inturn, outturn, draw, takeout, and all-shot quantities
 * corresponding shot percentages
 
@@ -121,15 +121,19 @@ The combination of:
 * player
 * event
 * event year
+* team code
+* position
 
 is unique.
 
-This table intentionally stores yearly statistics rather than aggregated career totals. Aggregate values are calculated using SQL when required.
+This table intentionally stores player stints rather than aggregate rows.
+Yearly and career totals are calculated using SQL when required. The archive's
+precomputed career totals and yearly `team: Totals` rows are not imported.
 
 The imported names match the archive's player-record fields: `inturn_total`,
 `outturn_total`, `draw_total`, `takeout_total`, and `shots_total`, each paired
 with a percentage. The archive's precomputed career totals are deliberately
-not stored; they are derived from yearly rows using total-weighted percentages.
+not stored; they are derived from player stints using total-weighted percentages.
 
 ---
 

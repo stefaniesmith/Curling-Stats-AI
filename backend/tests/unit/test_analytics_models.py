@@ -26,7 +26,7 @@ def test_statistics_identity_is_unique_per_player_event_and_year() -> None:
 
     assert any(
         tuple(column.name for column in constraint.columns)
-        == ("player_id", "event_id", "event_year")
+        == ("player_id", "event_id", "event_year", "team", "position")
         for constraint in unique_constraints
     )
 

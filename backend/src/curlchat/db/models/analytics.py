@@ -112,7 +112,7 @@ class Event(Base):
 
 
 class PlayerEventStatistics(Base):
-    """One archive player record for an event year; career totals are derived."""
+    """One archive player stint; yearly and career totals are derived."""
 
     __tablename__ = "player_event_statistics"
     __table_args__ = (
@@ -120,6 +120,8 @@ class PlayerEventStatistics(Base):
             "player_id",
             "event_id",
             "event_year",
+            "team",
+            "position",
             name="uq_player_event_statistics_player_event_year",
         ),
         CheckConstraint(
@@ -144,7 +146,7 @@ class PlayerEventStatistics(Base):
         ),
         Index("ix_player_event_statistics_event_year", "event_id", "event_year"),
         {
-            "comment": "Archive yearly player statistics; career totals are calculated from these rows."
+            "comment": "Archive player stints; yearly and career totals are calculated from these rows."
         },
     )
 
@@ -160,11 +162,11 @@ class PlayerEventStatistics(Base):
     event_year: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, comment="Archive event year."
     )
-    team: Mapped[str | None] = mapped_column(
-        String(100), nullable=True, comment="Archive team code for this event year."
+    team: Mapped[str] = mapped_column(
+        String(100), nullable=False, comment="Archive team code for this player stint."
     )
-    position: Mapped[str | None] = mapped_column(
-        String(50), nullable=True, comment="Archive player position for this event year."
+    position: Mapped[str] = mapped_column(
+        String(50), nullable=False, comment="Archive player position for this player stint."
     )
     alternate: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, comment="Whether the archive marks the player as an alternate."
