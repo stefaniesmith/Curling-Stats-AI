@@ -8,6 +8,7 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from curlchat.core.identities import ResolvedPlayerIdentity
 from curlchat.db.session import SessionLocal
 from curlchat.repositories.events import EventRepository
 from curlchat.services.event_resolver import EventResolution, EventResolutionStatus, EventResolver
@@ -29,9 +30,11 @@ class EventResolutionToolResult(BaseModel):
     matches: tuple[ResolvedEventMatch, ...] = Field(default_factory=tuple)
 
 
-def resolve_event_name(session: Session, name: str) -> EventResolution:
+def resolve_event_name(
+    session: Session, name: str, resolved_players: tuple[ResolvedPlayerIdentity, ...] = ()
+) -> EventResolution:
     """Resolve one user-provided event name through the application service."""
-    return EventResolver(EventRepository(session)).resolve(name)
+    return EventResolver(EventRepository(session)).resolve(name, resolved_players)
 
 
 @tool
@@ -40,10 +43,21 @@ def resolve_event(
         str,
         Field(description="The event name exactly as the user expressed it, including shorthand. Omit years."),
     ],
+    resolved_players: Annotated[
+        list[ResolvedPlayerIdentity] | None,
+        Field(
+            description=(
+                "Successful Player Resolver results, when available. The resolver uses these "
+                "identity pairs only to disambiguate otherwise matching events from source statistics."
+            )
+        ),
+    ] = None,
 ) -> str:
     """Resolve an event name before asking a question about event statistics."""
     with SessionLocal() as session:
-        resolution = resolve_event_name(session, name)
+        resolution = resolve_event_name(
+            session, name, tuple(resolved_players or ())
+        )
     return EventResolutionToolResult(
         query=resolution.query,
         status=resolution.status,

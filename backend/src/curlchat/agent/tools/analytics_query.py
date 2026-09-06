@@ -10,10 +10,9 @@ from pydantic import BaseModel, Field
 from curlchat.agent.graph.analytics_query_graph import (
     AnalyticsQueryWorkflow,
     OpenAISqlGenerator,
-    ResolvedEventIdentity,
-    ResolvedPlayerIdentity,
     analytics_schema_description,
 )
+from curlchat.core.identities import ResolvedEventIdentity, ResolvedPlayerIdentity
 from curlchat.db.session import SessionLocal, get_settings
 from curlchat.repositories.analytics import AnalyticsRepository
 from curlchat.services.stats_service import AnalyticsQueryResult, AnalyticsQueryStatus, StatsService

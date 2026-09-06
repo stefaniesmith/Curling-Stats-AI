@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from curlchat.core.names import normalize_name
-from curlchat.db.models import Event
+from curlchat.db.models import Event, PlayerEventStatistics
 
 
 @dataclass(frozen=True)
@@ -38,3 +38,21 @@ class EventRepository:
             )
             for event in self._session.scalars(select(Event).order_by(Event.id))
         ]
+
+    def event_ids_with_statistics_for_players(
+        self, event_ids: tuple[int, ...], player_ids: tuple[int, ...]
+    ) -> set[int]:
+        """Return candidate events containing statistics for every supplied player."""
+        if not event_ids or not player_ids:
+            return set()
+        return set(
+            self._session.scalars(
+                select(PlayerEventStatistics.event_id)
+                .where(
+                    PlayerEventStatistics.event_id.in_(event_ids),
+                    PlayerEventStatistics.player_id.in_(player_ids),
+                )
+                .group_by(PlayerEventStatistics.event_id)
+                .having(func.count(distinct(PlayerEventStatistics.player_id)) == len(player_ids))
+            )
+        )

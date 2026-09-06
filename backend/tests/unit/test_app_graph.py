@@ -62,9 +62,13 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert "Successful Player Resolver results only" in query_schema["properties"]["resolved_players"][
         "description"
     ]
+    assert set(event_resolver_schema["properties"]) == {"name", "resolved_players"}
     assert event_resolver_schema["properties"]["name"]["description"] == (
         "The event name exactly as the user expressed it, including shorthand. Omit years."
     )
+    assert "disambiguate otherwise matching events" in event_resolver_schema["properties"][
+        "resolved_players"
+    ]["description"]
     assert "Successful Event Resolver results only" in query_schema["properties"]["resolved_events"][
         "description"
     ]

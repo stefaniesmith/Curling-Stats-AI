@@ -142,6 +142,7 @@ used by the Analytics Query Tool.
 ### Inputs
 
 * event names extracted from the user's request; a year in the phrase is ignored
+* optional resolved player identities, used only to narrow ambiguous event candidates
 
 ### Outputs
 
@@ -151,6 +152,11 @@ used by the Analytics Query Tool.
 For example, “Canada Cup” produces the distinct men's and women's event
 candidates as an ambiguous result. The agent must ask the user to choose, or
 explicitly resolve both events if the user asks for both.
+
+When resolved player identities are supplied, the resolver may narrow an
+ambiguous event only if exactly one candidate contains source statistics for
+every supplied player. This is a data-based disambiguation rule; it does not
+infer personal attributes from a player's name.
 
 ---
 

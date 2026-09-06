@@ -7,12 +7,11 @@ from curlchat.agent.graph.analytics_query_graph import (
     AnalyticsQueryWorkflow,
     GeneratedAnalyticsQuery,
     OpenAISqlGenerator,
-    ResolvedEventIdentity,
-    ResolvedPlayerIdentity,
     SqlGenerator,
     analytics_schema_description,
     sql_generation_prompt,
 )
+from curlchat.core.identities import ResolvedEventIdentity, ResolvedPlayerIdentity
 from curlchat.db.models import Player
 from curlchat.db.session import Base, Settings
 from curlchat.repositories.analytics import AnalyticsRepository

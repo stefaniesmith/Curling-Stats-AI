@@ -7,6 +7,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from curlchat.core.identities import ResolvedPlayerIdentity
 from curlchat.core.names import normalize_name
 from curlchat.repositories.events import EventNameRecord, EventRepository
 
@@ -54,7 +55,9 @@ class EventResolver:
     def __init__(self, repository: EventRepository) -> None:
         self._repository = repository
 
-    def resolve(self, query: str) -> EventResolution:
+    def resolve(
+        self, query: str, resolved_players: tuple[ResolvedPlayerIdentity, ...] = ()
+    ) -> EventResolution:
         """Resolve an event name, returning ambiguity rather than guessing."""
         normalized_query = self._without_year_tokens(normalize_name(query))
         if not normalized_query:
@@ -63,11 +66,11 @@ class EventResolver:
         records = self._repository.list_name_records()
         exact_matches = self._matches_exactly(records, normalized_query)
         if exact_matches:
-            return self._resolution_for(query, exact_matches)
+            return self._resolution_for(query, exact_matches, resolved_players)
 
         shorthand_matches = self._matches_shorthand(records, normalized_query)
         if shorthand_matches:
-            return self._resolution_for(query, shorthand_matches)
+            return self._resolution_for(query, shorthand_matches, resolved_players)
 
         suggestions = self._fuzzy_matches(records, normalized_query)
         if self._is_clear_fuzzy_match(suggestions):
@@ -138,13 +141,37 @@ class EventResolver:
             for score, record in candidates[:_MAX_SUGGESTIONS]
         )
 
-    @staticmethod
-    def _resolution_for(query: str, matches: tuple[ResolvedEvent, ...]) -> EventResolution:
+    def _resolution_for(
+        self,
+        query: str,
+        matches: tuple[ResolvedEvent, ...],
+        resolved_players: tuple[ResolvedPlayerIdentity, ...],
+    ) -> EventResolution:
+        narrowed_matches = self._narrow_by_player_statistics(matches, resolved_players)
         return EventResolution(
             query=query,
-            status=(EventResolutionStatus.MATCHED if len(matches) == 1 else EventResolutionStatus.AMBIGUOUS),
-            matches=matches,
+            status=(
+                EventResolutionStatus.MATCHED
+                if len(narrowed_matches) == 1
+                else EventResolutionStatus.AMBIGUOUS
+            ),
+            matches=narrowed_matches,
         )
+
+    def _narrow_by_player_statistics(
+        self,
+        matches: tuple[ResolvedEvent, ...],
+        resolved_players: tuple[ResolvedPlayerIdentity, ...],
+    ) -> tuple[ResolvedEvent, ...]:
+        """Use source statistics to disambiguate an event for resolved players."""
+        if len(matches) < 2 or not resolved_players:
+            return matches
+        matching_event_ids = self._repository.event_ids_with_statistics_for_players(
+            tuple(match.event_id for match in matches),
+            tuple(player.player_id for player in resolved_players),
+        )
+        narrowed_matches = tuple(match for match in matches if match.event_id in matching_event_ids)
+        return narrowed_matches if len(narrowed_matches) == 1 else matches
 
     @staticmethod
     def _is_clear_fuzzy_match(matches: tuple[ResolvedEvent, ...]) -> bool:

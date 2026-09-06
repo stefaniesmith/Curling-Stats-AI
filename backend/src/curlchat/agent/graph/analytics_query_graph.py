@@ -13,6 +13,7 @@ from openai import OpenAIError
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, Engine, inspect
 
+from curlchat.core.identities import ResolvedEventIdentity, ResolvedPlayerIdentity
 from curlchat.db.session import Settings
 from curlchat.services.stats_service import AnalyticsQueryResult, AnalyticsQueryStatus, StatsService
 
@@ -26,20 +27,6 @@ class GeneratedAnalyticsQuery(BaseModel):
     sql: str | None = Field(default=None, description="One read-only PostgreSQL SELECT query.")
     parameters: dict[str, Any] = Field(default_factory=dict)
     reason: str | None = Field(default=None, description="Reason a request is unsupported, if applicable.")
-
-
-class ResolvedPlayerIdentity(BaseModel):
-    """A player identity passed between the resolver and analytics boundaries."""
-
-    display_name: str = Field(description="The resolved player's display name.")
-    player_id: int = Field(description="The resolved player's database identifier.")
-
-
-class ResolvedEventIdentity(BaseModel):
-    """An event identity passed between the resolver and analytics boundaries."""
-
-    display_name: str = Field(description="The resolved event's display name.")
-    event_id: int = Field(description="The resolved event's database identifier.")
 
 
 class AnalyticsQueryState(BaseModel):

@@ -164,7 +164,10 @@ Resolves a named competition before analytics query generation.
 The resolver returns one canonical event identity pair (`display_name` and
 `event_id`) when matching is unambiguous. For shorthand such as “Canada Cup”
 that matches distinct men's and women's events, it returns the candidates as
-ambiguous and the main agent asks the user to clarify.
+ambiguous and the main agent asks the user to clarify. When the agent has
+already resolved player identities, it supplies them as context; the resolver
+may then select one event only when source statistics show that every supplied
+player has records for that candidate.
 
 ---
 

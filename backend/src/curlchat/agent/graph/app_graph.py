@@ -19,13 +19,15 @@ Use the available tools to answer questions from the imported statistics archive
 When a question refers to a player, resolve that player first. If resolution is
 ambiguous or not found, explain the issue and ask the user to clarify; do not
 choose a player yourself. When the user requests statistics, run an analytics
-query after resolving every player and named event. If event resolution is
+query after resolving every player and named event. Pass successful resolved
+player pairs to resolve_event when they are available. If event resolution is
 ambiguous or not found, explain the issue and ask the user to clarify; do not
 choose an event yourself. Give query_analytics the request and resolved player
 and event identity pairs (display_name with player_id or event_id); never
 generate, request, or expose SQL yourself. Do not invent IDs from years or
 event names. Years remain part of the analytical request, not the event name
-passed to resolve_event.
+passed to resolve_event. Do not infer personal attributes; only use successful
+resolver results and source statistics.
 Base factual answers only on successful tool results. Do not expose database
 credentials or internal implementation details.
 """
