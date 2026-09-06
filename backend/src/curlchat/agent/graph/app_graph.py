@@ -7,11 +7,14 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from openai import OpenAIError
+from pydantic import BaseModel, Field, ValidationError
 
 from curlchat.agent.tools.analytics_query import query_analytics
 from curlchat.agent.tools.event_resolver import resolve_event
 from curlchat.agent.tools.player_resolver import resolve_player
+from curlchat.agent.tools.visualization import create_visualization
 from curlchat.db.session import Settings, get_settings
+from curlchat.services.visualization_service import VisualizationArtifact
 
 SYSTEM_PROMPT = """You are CurlChat, a careful assistant for Curling Canada player statistics.
 
@@ -27,9 +30,17 @@ and event identity pairs (display_name with player_id or event_id); never
 generate, request, or expose SQL yourself. Do not invent IDs from years or
 event names. Years remain part of the analytical request, not the event name
 passed to resolve_event. Do not infer personal attributes; only use successful
-resolver results and source statistics.
-Base factual answers only on successful tool results. Do not expose database
-credentials or internal implementation details.
+resolver results and source statistics. After a successful analytics result,
+use create_visualization when a table, concise summary, or chart would
+materially improve the answer. Pass the successful result unchanged inside its
+request object. Select bar for category comparisons, line for trends over
+years, and dot for small discrete comparisons. Use a long data_mapping for
+row-based results or a wide data_mapping to choose stat columns as categories.
+Supply a series column inside the mapping for grouped bars or multiple lines
+when the result has a comparison dimension such as player name. Do not request
+a visualization if it would not add clarity. Base factual answers only on
+successful tool results. Do not expose database credentials or internal
+implementation details.
 """
 
 
@@ -39,6 +50,12 @@ class AgentConfigurationError(RuntimeError):
 class AgentInvocationError(RuntimeError):
     """The configured model provider could not complete an agent request."""
 
+
+class AgentResponse(BaseModel):
+    """Final text and renderable artifacts from one agent invocation."""
+
+    message: str
+    artifacts: tuple[VisualizationArtifact, ...] = Field(default_factory=tuple)
 
 
 def build_graph(settings: Settings | None = None) -> Any:
@@ -54,19 +71,36 @@ def build_graph(settings: Settings | None = None) -> Any:
     )
     return create_react_agent(
         model=model,
-        tools=[resolve_player, resolve_event, query_analytics],
+        tools=[resolve_player, resolve_event, query_analytics, create_visualization],
         prompt=SYSTEM_PROMPT,
     )
 
 
-def respond_to_message(message: str, settings: Settings | None = None) -> str:
-    """Run one user message through the graph and return its final text response."""
+def respond_to_message(message: str, settings: Settings | None = None) -> AgentResponse:
+    """Run one user message through the graph and return text plus created artifacts."""
     graph = build_graph(settings)
     try:
         state = graph.invoke({"messages": [{"role": "user", "content": message}]})
     except OpenAIError as error:
         raise AgentInvocationError("The model provider could not complete the request.") from error
-    return _message_text(state["messages"][-1].content)
+    messages = state["messages"]
+    return AgentResponse(
+        message=_message_text(messages[-1].content),
+        artifacts=_visualization_artifacts(messages),
+    )
+
+
+def _visualization_artifacts(messages: list[Any]) -> tuple[VisualizationArtifact, ...]:
+    """Extract valid Visualization Tool outputs without trusting arbitrary tool content."""
+    artifacts: list[VisualizationArtifact] = []
+    for message in messages:
+        if getattr(message, "name", None) != create_visualization.name:
+            continue
+        try:
+            artifacts.append(VisualizationArtifact.model_validate_json(_message_text(message.content)))
+        except (ValidationError, ValueError):
+            continue
+    return tuple(artifacts)
 
 
 def _message_text(content: Any) -> str:

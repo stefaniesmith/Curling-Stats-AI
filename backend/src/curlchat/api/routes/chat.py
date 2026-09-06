@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 def create_chat_response(request: ChatRequest) -> ChatResponse:
     try:
-        message = respond_to_message(request.message)
+        response = respond_to_message(request.message)
     except AgentConfigurationError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -26,6 +26,12 @@ def create_chat_response(request: ChatRequest) -> ChatResponse:
         ) from error
     return ChatResponse(
         conversation_id=request.conversation_id,
-        message=message,
-        blocks=[{"type": "markdown", "payload": {"content": message}}],
+        message=response.message,
+        blocks=[
+            {"type": "markdown", "payload": {"content": response.message}},
+            *(
+                {"type": artifact.type, "payload": artifact.payload}
+                for artifact in response.artifacts
+            ),
+        ],
     )

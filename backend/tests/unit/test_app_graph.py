@@ -42,12 +42,18 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     }
     assert captured["graph"] == {
         "model": "model",
-        "tools": [app_graph.resolve_player, app_graph.resolve_event, app_graph.query_analytics],
+        "tools": [
+            app_graph.resolve_player,
+            app_graph.resolve_event,
+            app_graph.query_analytics,
+            app_graph.create_visualization,
+        ],
         "prompt": app_graph.SYSTEM_PROMPT,
     }
     query_schema = app_graph.query_analytics.args_schema.model_json_schema()
     resolver_schema = app_graph.resolve_player.args_schema.model_json_schema()
     event_resolver_schema = app_graph.resolve_event.args_schema.model_json_schema()
+    visualization_schema = app_graph.create_visualization.args_schema.model_json_schema()
     assert "sql" not in query_schema["properties"]
     assert set(query_schema["properties"]) == {"request", "resolved_players", "resolved_events"}
     assert "display_name" in str(query_schema)
@@ -73,6 +79,11 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
         "description"
     ]
     assert "never generate, request, or expose SQL" in app_graph.SYSTEM_PROMPT.replace("\n", " ")
+    assert set(visualization_schema["properties"]) == {"request"}
+    assert visualization_schema["properties"]["request"]["description"] == (
+        "One successful analytics result plus a typed table, summary, or chart specification. "
+        "Pass result rows unchanged."
+    )
 
 
 def test_respond_to_message_returns_final_text(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,7 +94,32 @@ def test_respond_to_message_returns_final_text(monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr(app_graph, "build_graph", lambda settings=None: FakeGraph())
 
-    assert app_graph.respond_to_message("Show Brier stats") == "Here are the statistics."
+    assert app_graph.respond_to_message("Show Brier stats") == app_graph.AgentResponse(
+        message="Here are the statistics."
+    )
+
+
+def test_respond_to_message_collects_visualization_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeGraph:
+        def invoke(self, _: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    SimpleNamespace(
+                        name="create_visualization",
+                        content=(
+                            '{"type":"chart","payload":{"chart_type":"bar","points":[]}}'
+                        ),
+                    ),
+                    SimpleNamespace(content="Here is a chart."),
+                ]
+            }
+
+    monkeypatch.setattr(app_graph, "build_graph", lambda settings=None: FakeGraph())
+
+    response = app_graph.respond_to_message("Compare wins")
+
+    assert response.message == "Here is a chart."
+    assert response.artifacts[0].type == "chart"
 
 
 def test_message_text_extracts_responses_content_blocks() -> None:

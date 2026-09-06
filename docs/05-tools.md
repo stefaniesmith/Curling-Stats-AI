@@ -23,9 +23,9 @@ Visualization Tool
 
 Each tool is designed to operate independently and can evolve without requiring significant changes to the agent itself.
 
-The initial LangGraph implementation exposes the Player Resolver, Event
-Resolver, and Analytics Query Tool. The Visualization Tool remains part of the
-documented architecture but is not yet wired into the graph.
+The initial LangGraph implementation exposes all four tools. The Visualization
+Tool creates artifacts from an already-successful Analytics Query Tool result;
+it never queries the database or renders charts itself.
 
 ---
 
@@ -260,8 +260,9 @@ The tool does not render charts itself.
 
 ### Inputs
 
-* structured query results
-* query metadata
+* one successful structured query result, preserved unchanged
+* a Pydantic-discriminated visualization specification with a `type` of
+  `table`, `summary`, or `chart`
 
 ---
 
@@ -272,6 +273,30 @@ The tool does not render charts itself.
 * summary artifacts
 
 The frontend is responsible for rendering these artifacts into interactive user interface components.
+
+### Initial Artifact Contract
+
+The first implementation creates exactly one artifact per tool call. It
+supports:
+
+* `table`, preserving the analytics columns and rows
+* `summary`, using an explicit deterministic `average`, `minimum`, `maximum`,
+  or `sum` over one numeric result column
+* `chart`, using an explicit `bar`, `line`, or `dot` renderer and either a
+  `long` row-based mapping with validated x- and numeric y-axis columns, or a
+  `wide` mapping that reshapes selected numeric stat columns into categories;
+  an optional series column produces grouped bars or multiple line/dot traces
+
+The agent decides whether an artifact improves the answer and, for a chart,
+which supported renderer suits the result. The service validates its selected
+fields and builds only the frontend-ready payload. Invalid requests return a
+structured tool error rather than silently changing the visualization.
+
+The input is one typed request with separate `result` and `spec` objects. The
+specification is a discriminated union: the table variant exposes only a title;
+the summary variant requires a value column and aggregation; and the chart
+variant requires its renderer plus a typed `long` or `wide` data mapping. This
+keeps unrelated fields out of each tool call shape.
 
 ---
 

@@ -15,13 +15,13 @@ The agent is implemented using LangGraph, providing explicit workflow orchestrat
 ## Initial Implementation
 
 The first implemented graph uses a configurable OpenAI chat model and exposes
-three tools: Player Resolver, Event Resolver, and Analytics Query. It is stateless and returns a
-single Markdown response through the chat endpoint. The model is instructed to
-resolve player identities before querying statistics, and it has no direct
-database access or SQL-generation responsibility.
+four tools: Player Resolver, Event Resolver, Analytics Query, and
+Visualization. It is stateless and returns Markdown plus any visualization
+artifacts created during the turn through the chat endpoint. The model is
+instructed to resolve player identities before querying statistics, and it has
+no direct database access or SQL-generation responsibility.
 
-Conversation persistence, streaming, and visualization selection remain later
-implementation steps.
+Conversation persistence and streaming remain later implementation steps.
 
 ---
 

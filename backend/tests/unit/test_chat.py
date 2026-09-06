@@ -1,7 +1,12 @@
 from fastapi.testclient import TestClient
 
-from curlchat.agent.graph.app_graph import AgentConfigurationError, AgentInvocationError
+from curlchat.agent.graph.app_graph import (
+    AgentConfigurationError,
+    AgentInvocationError,
+    AgentResponse,
+)
 from curlchat.main import app
+from curlchat.services.visualization_service import VisualizationArtifact, VisualizationType
 
 client = TestClient(app)
 
@@ -9,7 +14,15 @@ client = TestClient(app)
 def test_chat_returns_an_agent_response(monkeypatch) -> None:
     monkeypatch.setattr(
         "curlchat.api.routes.chat.respond_to_message",
-        lambda message: f"Answer for: {message}",
+        lambda message: AgentResponse(
+            message=f"Answer for: {message}",
+            artifacts=(
+                VisualizationArtifact(
+                    type=VisualizationType.TABLE,
+                    payload={"columns": ["wins"], "rows": [{"wins": 8}]},
+                ),
+            ),
+        ),
     )
 
     response = client.post("/api/chat", json={"message": "Show Tyler Tardi's Brier statistics."})
@@ -22,7 +35,8 @@ def test_chat_returns_an_agent_response(monkeypatch) -> None:
             {
                 "type": "markdown",
                 "payload": {"content": "Answer for: Show Tyler Tardi's Brier statistics."},
-            }
+            },
+            {"type": "table", "payload": {"columns": ["wins"], "rows": [{"wins": 8}]}},
         ],
     }
 
