@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +13,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from curlchat.core.names import normalize_name
 from curlchat.db.models import Event, Player, PlayerAlias, PlayerEventStatistics
 
 STATISTIC_FIELDS = (
@@ -91,19 +91,6 @@ class ImportReport:
     events: int
     yearly_statistics: int
     skipped_aliases: int
-
-
-def normalize_name(name: str) -> str:
-    """Normalize a display or surname-first archive name for lookup."""
-    name = name.strip()
-    if "," in name:
-        surname, given_names = (part.strip() for part in name.split(",", maxsplit=1))
-        name = f"{given_names} {surname}"
-    decomposed = unicodedata.normalize("NFKD", name)
-    without_diacritics = "".join(
-        character for character in decomposed if not unicodedata.combining(character)
-    )
-    return " ".join(re.sub(r"[^\w]+", " ", without_diacritics.casefold()).split())
 
 
 def event_slug(event_name: str) -> str:
