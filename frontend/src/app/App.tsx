@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import logoUrl from "../../../assets/CurlChatLogo.png";
-import { ApiError, listConversations, sendMessage } from "../lib/api";
+import { ApiError, getConversationMessages, listConversations, sendMessage } from "../lib/api";
 import { ResponseBlocks } from "../features/visualizations/ResponseBlocks";
 import type { Conversation, ResponseBlock } from "../types/api";
 
@@ -24,6 +24,7 @@ export function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [error, setError] = useState<string>();
   const messagesContainer = useRef<HTMLDivElement>(null);
@@ -52,12 +53,28 @@ export function App() {
     setMessages([]);
     setDraft("");
     setError(undefined);
+    setIsLoadingHistory(false);
   };
 
-  const selectConversation = (id: string) => {
+  const selectConversation = async (id: string) => {
     setActiveConversationId(id);
     setMessages([]);
     setError(undefined);
+    setIsLoadingHistory(true);
+    try {
+      const history = await getConversationMessages(id);
+      setMessages(history.map((message) => ({
+        id: crypto.randomUUID(),
+        role: message.role,
+        content: message.role === "user" ? message.content : undefined,
+        blocks: message.role === "assistant" ? message.blocks : undefined,
+      })));
+    } catch (cause) {
+      const apiError = cause instanceof ApiError ? cause : new ApiError("Could not load this conversation.");
+      setError(apiError.status === 404 ? "This conversation is no longer available. Start a new one to continue." : apiError.message);
+    } finally {
+      setIsLoadingHistory(false);
+    }
   };
 
   const submit = async (event?: FormEvent, message = draft) => {
@@ -95,7 +112,7 @@ export function App() {
         <div className="conversation-heading"><span>Recent conversations</span><button aria-label="Refresh conversations" onClick={() => void refreshConversations()}>↻</button></div>
         <nav className="conversation-list" aria-label="Recent conversations">
           {isLoadingConversations ? <p className="sidebar-status">Loading conversations…</p> : conversations.length ? conversations.map((conversation) => (
-            <button className={conversation.id === activeConversationId ? "conversation active" : "conversation"} key={conversation.id} onClick={() => selectConversation(conversation.id)}>
+            <button className={conversation.id === activeConversationId ? "conversation active" : "conversation"} key={conversation.id} onClick={() => void selectConversation(conversation.id)}>
               <span>{conversation.title}</span><small>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(conversation.updated_at))}</small>
             </button>
           )) : <p className="sidebar-status">Your conversations will appear here.</p>}
@@ -106,7 +123,8 @@ export function App() {
       <section className="chat-panel">
         <header className="chat-header"><div><p>CONVERSATIONAL ANALYTICS</p><h1>{activeTitle ?? "New conversation"}</h1></div><span className="status-dot">Archive connected</span></header>
         <div className="messages" ref={messagesContainer}>
-          {isWelcome && <Welcome onPrompt={(prompt) => void submit(undefined, prompt)} />}
+          {isLoadingHistory && <div className="history-loading">Loading conversation…</div>}
+          {isWelcome && !isLoadingHistory && <Welcome onPrompt={(prompt) => void submit(undefined, prompt)} />}
           {messages.map((message) => <article className={`message ${message.role}`} key={message.id}>
             <div className="message-label">{message.role === "assistant" ? "CurlChat" : "You"}</div>
             {message.content && <p>{message.content}</p>}
@@ -116,8 +134,8 @@ export function App() {
           {error && <div className="error-banner"><strong>Unable to complete the request.</strong> {error}</div>}
         </div>
         <form className="composer" onSubmit={submit}>
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about a player, event, season, or statistic…" rows={1} disabled={isSending} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
-          <button type="submit" disabled={isSending || !draft.trim()} aria-label="Send message">↑</button>
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about a player, event, season, or statistic…" rows={1} disabled={isSending || isLoadingHistory} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
+          <button type="submit" disabled={isSending || isLoadingHistory || !draft.trim()} aria-label="Send message">↑</button>
         </form>
         <p className="composer-note">CurlChat uses the Curling Canada statistics archive. Results may include historical source records.</p>
       </section>

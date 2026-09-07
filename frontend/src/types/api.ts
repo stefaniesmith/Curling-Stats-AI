@@ -18,6 +18,12 @@ export interface Conversation {
   updated_at: string;
 }
 
+export interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+  blocks: ResponseBlock[];
+}
+
 export interface ChatRequest {
   message: string;
   conversation_id?: string;

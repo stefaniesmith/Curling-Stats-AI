@@ -221,6 +221,23 @@ def test_respond_to_message_omits_artifacts_from_prior_persisted_turns(
     assert [artifact.payload["title"] for artifact in response.artifacts] == ["New chart"]
 
 
+def test_history_messages_excludes_internal_tool_traffic() -> None:
+    history = app_graph._history_messages(
+        [
+            SimpleNamespace(type="human", content="Show Brad Jacobs' Brier statistics."),
+            SimpleNamespace(type="ai", content="", tool_calls=[{"name": "query_analytics"}]),
+            SimpleNamespace(name="create_visualization", content='{"type":"table","payload":{"rows":[]}}'),
+            SimpleNamespace(type="ai", content="Here are the results.", tool_calls=[]),
+        ]
+    )
+
+    assert [(message.role, message.content) for message in history] == [
+        ("user", "Show Brad Jacobs' Brier statistics."),
+        ("assistant", "Here are the results."),
+    ]
+    assert history[1].artifacts[0].type == "table"
+
+
 def test_message_text_extracts_responses_content_blocks() -> None:
     assert app_graph._message_text(
         [{"type": "text", "text": "First"}, {"type": "text", "text": "Second"}]

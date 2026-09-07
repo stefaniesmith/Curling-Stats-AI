@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from langchain_openai import ChatOpenAI
@@ -71,6 +71,14 @@ class AgentResponse(BaseModel):
     artifacts: tuple[VisualizationArtifact, ...] = Field(default_factory=tuple)
 
 
+class ConversationHistoryMessage(BaseModel):
+    """One frontend-safe message reconstructed from persisted LangGraph state."""
+
+    role: Literal["user", "assistant"]
+    content: str
+    artifacts: tuple[VisualizationArtifact, ...] = Field(default_factory=tuple)
+
+
 def build_graph(
     settings: Settings | None = None, checkpointer: BaseCheckpointSaver | None = None
 ) -> Any:
@@ -130,6 +138,23 @@ def respond_to_message(
     )
 
 
+def load_conversation_history(
+    conversation_id: UUID, settings: Settings | None = None
+) -> tuple[ConversationHistoryMessage, ...]:
+    """Load renderable messages from the latest persisted graph state for one conversation."""
+    configured_settings = settings or get_settings()
+    with PostgresSaver.from_conn_string(
+        _psycopg_url(configured_settings.state_database_url)
+    ) as checkpointer:
+        checkpoint = checkpointer.get_tuple(
+            {"configurable": {"thread_id": str(conversation_id)}}
+        )
+    if checkpoint is None:
+        return ()
+    messages = checkpoint.checkpoint["channel_values"].get("messages", [])
+    return _history_messages(messages)
+
+
 def _psycopg_url(database_url: str) -> str:
     """Convert SQLAlchemy's psycopg URL form to the driver's connection URL."""
     return make_url(database_url).set(drivername="postgresql").render_as_string(hide_password=False)
@@ -159,6 +184,46 @@ def _current_turn_messages(messages: list[Any]) -> list[Any]:
         if message_type == "human" or role == "user":
             return messages[index + 1 :]
     return messages
+
+
+def _history_messages(messages: list[Any]) -> tuple[ConversationHistoryMessage, ...]:
+    """Filter internal tool traffic and associate visualization artifacts with each reply."""
+    history: list[ConversationHistoryMessage] = []
+    artifacts: list[VisualizationArtifact] = []
+    for message in messages:
+        message_type = _message_type(message)
+        if message_type == "human":
+            history.append(ConversationHistoryMessage(role="user", content=_message_text(_content(message))))
+            artifacts = []
+            continue
+        if getattr(message, "name", None) == create_visualization.name:
+            try:
+                artifacts.append(VisualizationArtifact.model_validate_json(_message_text(_content(message))))
+            except (ValidationError, ValueError):
+                continue
+            continue
+        if message_type == "ai" and not _tool_calls(message):
+            content = _message_text(_content(message))
+            if content:
+                history.append(
+                    ConversationHistoryMessage(
+                        role="assistant", content=content, artifacts=tuple(artifacts)
+                    )
+                )
+                artifacts = []
+    return tuple(history)
+
+
+def _message_type(message: Any) -> Any:
+    return message.get("type") if isinstance(message, dict) else getattr(message, "type", None)
+
+
+def _content(message: Any) -> Any:
+    return message.get("content") if isinstance(message, dict) else getattr(message, "content", "")
+
+
+def _tool_calls(message: Any) -> Any:
+    return message.get("tool_calls") if isinstance(message, dict) else getattr(message, "tool_calls", None)
 
 
 def _message_text(content: Any) -> str:

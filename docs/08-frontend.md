@@ -20,7 +20,7 @@ It does not implement player resolution, query logic, or visualization construct
 
 On a user's first message, the UI omits `conversation_id`. The API creates the conversation and returns its UUID; the UI stores it as the active conversation and includes it with each follow-up request. The sidebar refreshes after a completed response so the new or updated metadata is immediately visible.
 
-The API currently exposes conversation metadata rather than persisted message history. Selecting a previous conversation establishes it as the active server-side context for the next message, but cannot reconstruct its prior messages in the browser. Message-history retrieval should be added as a deliberate API contract before the UI attempts to display it.
+Selecting a previous conversation fetches its persisted history from `GET /api/conversations/{conversation_id}/messages`, disables the composer during hydration, and renders the returned user and assistant blocks. The server owns history reconstruction from LangGraph state; the browser never reads checkpointer tables or recreates artifacts.
 
 ## Response Blocks
 

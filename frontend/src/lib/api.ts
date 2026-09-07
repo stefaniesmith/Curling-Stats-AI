@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatResponse, Conversation } from "../types/api";
+import type { ChatRequest, ChatResponse, Conversation, ConversationMessage } from "../types/api";
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status?: number) {
@@ -23,6 +23,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const listConversations = () => request<Conversation[]>("/api/conversations");
+
+export const getConversationMessages = (conversationId: string) =>
+  request<ConversationMessage[]>(`/api/conversations/${conversationId}/messages`);
 
 export const sendMessage = (body: ChatRequest) =>
   request<ChatResponse>("/api/chat", {
