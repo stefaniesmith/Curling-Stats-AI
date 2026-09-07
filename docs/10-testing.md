@@ -18,5 +18,6 @@ Initial coverage verifies:
 * sidebar history hydration and API-error feedback
 * Markdown, summary, and table artifact rendering
 * multi-series chart colors, title wrapping, and legend spacing
+* streaming conversation IDs and progressive Markdown event handling
 
 Run frontend tests with `pnpm test` and create a production bundle with `pnpm build`.

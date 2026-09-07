@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import nullcontext
 from typing import Any, Literal
 from uuid import UUID
@@ -71,6 +72,13 @@ class AgentResponse(BaseModel):
     artifacts: tuple[VisualizationArtifact, ...] = Field(default_factory=tuple)
 
 
+class AgentStreamEvent(BaseModel):
+    """One renderable event emitted while a graph turn is in progress."""
+
+    type: Literal["markdown_delta", "artifact", "complete"]
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class ConversationHistoryMessage(BaseModel):
     """One frontend-safe message reconstructed from persisted LangGraph state."""
 
@@ -138,6 +146,41 @@ def respond_to_message(
     )
 
 
+def stream_response(
+    message: str, conversation_id: UUID, settings: Settings | None = None
+) -> Iterator[AgentStreamEvent]:
+    """Stream final Markdown tokens and complete visualization artifacts for one turn."""
+    configured_settings = settings or get_settings()
+    try:
+        with PostgresSaver.from_conn_string(
+            _psycopg_url(configured_settings.state_database_url)
+        ) as checkpointer:
+            graph = build_graph(configured_settings, checkpointer=checkpointer)
+            config = {"configurable": {"thread_id": str(conversation_id)}}
+            for mode, data in graph.stream(
+                {"messages": [{"role": "user", "content": message}]},
+                config=config,
+                stream_mode=["messages", "updates"],
+                durability="sync",
+            ):
+                if mode == "messages":
+                    chunk, metadata = data
+                    if metadata.get("langgraph_node") != "agent":
+                        continue
+                    text = _message_text(_content(chunk))
+                    if text:
+                        yield AgentStreamEvent(type="markdown_delta", payload={"delta": text})
+                elif mode == "updates":
+                    for artifact in _artifacts_from_updates(data):
+                        yield AgentStreamEvent(
+                            type="artifact",
+                            payload={"type": artifact.type, "payload": artifact.payload},
+                        )
+    except OpenAIError as error:
+        raise AgentInvocationError("The model provider could not complete the request.") from error
+    yield AgentStreamEvent(type="complete")
+
+
 def load_conversation_history(
     conversation_id: UUID, settings: Settings | None = None
 ) -> tuple[ConversationHistoryMessage, ...]:
@@ -170,6 +213,20 @@ def _visualization_artifacts(messages: list[Any]) -> tuple[VisualizationArtifact
             artifacts.append(VisualizationArtifact.model_validate_json(_message_text(message.content)))
         except (ValidationError, ValueError):
             continue
+    return tuple(artifacts)
+
+
+def _artifacts_from_updates(update: Any) -> tuple[VisualizationArtifact, ...]:
+    """Extract artifacts from current-turn ToolNode updates only."""
+    if not isinstance(update, dict):
+        return ()
+    artifacts: list[VisualizationArtifact] = []
+    for node_update in update.values():
+        if not isinstance(node_update, dict):
+            continue
+        messages = node_update.get("messages")
+        if isinstance(messages, list):
+            artifacts.extend(_visualization_artifacts(messages))
     return tuple(artifacts)
 
 

@@ -4,11 +4,18 @@
 
 CurlChat exposes a synchronous HTTP API from FastAPI. The API validates and serializes requests at the boundary; agent orchestration, deterministic services, and database access remain behind it.
 
-## Chat
+## Synchronous Chat
 
 `POST /api/chat` accepts a `message` and optional `conversation_id` UUID. Without an ID, the server creates conversation metadata before invoking the agent and returns the new UUID. With an ID, the server verifies that metadata exists, then invokes the persisted LangGraph thread with the same UUID.
 
-The response contains the conversation ID, the assistant's Markdown message, and ordered renderable blocks. The synchronous implementation always returns the complete turn. It does not stream partial content.
+The response contains the conversation ID, the assistant's Markdown message, and ordered renderable blocks. This endpoint always returns the complete turn and remains available as a fallback for clients that do not consume SSE.
+
+## Streaming Chat
+
+`POST /api/chat/stream` accepts the same JSON request as synchronous chat and
+returns server-sent events. It emits a conversation ID first, then Markdown
+deltas and completed visualization artifacts as they are available. See
+`docs/09-streaming.md` for the event lifecycle and error behavior.
 
 ## Conversations
 

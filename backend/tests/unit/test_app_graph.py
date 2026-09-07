@@ -238,6 +238,59 @@ def test_history_messages_excludes_internal_tool_traffic() -> None:
     assert history[1].artifacts[0].type == "table"
 
 
+def test_stream_response_emits_text_deltas_and_complete_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeCheckpointerContext:
+        def __enter__(self) -> object:
+            return object()
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    class FakeGraph:
+        def stream(self, state: dict[str, object], **kwargs: object):
+            assert state == {"messages": [{"role": "user", "content": "Compare wins"}]}
+            assert kwargs["stream_mode"] == ["messages", "updates"]
+            return iter(
+                [
+                    ("messages", (SimpleNamespace(content="Here "), {"langgraph_node": "agent"})),
+                    ("messages", (SimpleNamespace(content="are the results."), {"langgraph_node": "agent"})),
+                    (
+                        "updates",
+                        {
+                            "tools": {
+                                "messages": [
+                                    SimpleNamespace(
+                                        name="create_visualization",
+                                        content='{"type":"table","payload":{"rows":[]}}',
+                                    )
+                                ]
+                            }
+                        },
+                    ),
+                ]
+            )
+
+    monkeypatch.setattr(
+        app_graph.PostgresSaver,
+        "from_conn_string",
+        lambda _: FakeCheckpointerContext(),
+    )
+    monkeypatch.setattr(app_graph, "build_graph", lambda settings, checkpointer: FakeGraph())
+
+    events = list(
+        app_graph.stream_response(
+            "Compare wins", uuid4(), Settings(openai_api_key=SecretStr("test-key"))
+        )
+    )
+
+    assert [(event.type, event.payload) for event in events] == [
+        ("markdown_delta", {"delta": "Here "}),
+        ("markdown_delta", {"delta": "are the results."}),
+        ("artifact", {"type": "table", "payload": {"rows": []}}),
+        ("complete", {}),
+    ]
+
+
 def test_message_text_extracts_responses_content_blocks() -> None:
     assert app_graph._message_text(
         [{"type": "text", "text": "First"}, {"type": "text", "text": "Second"}]

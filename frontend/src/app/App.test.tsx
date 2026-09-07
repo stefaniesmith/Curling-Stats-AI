@@ -9,6 +9,11 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
   headers: { "Content-Type": "application/json" },
 });
 
+const streamResponse = (events: Array<{ type: string; payload: object }>) => new Response(
+  events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`).join(""),
+  { headers: { "Content-Type": "text/event-stream" } },
+);
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
   let messageNumber = 0;
@@ -22,13 +27,15 @@ describe("App", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/conversations") return jsonResponse([]);
-      if (url === "/api/chat") {
+      if (url === "/api/chat/stream") {
         const body = JSON.parse(String(init?.body));
-        return jsonResponse({
-          conversation_id: "conversation-id",
-          message: `Answer: ${body.message}`,
-          blocks: [{ type: "markdown", payload: { content: `Answer: ${body.message}` } }],
-        });
+        return streamResponse([
+          { type: "message_start", payload: { conversation_id: "conversation-id" } },
+          { type: "markdown_delta", payload: { delta: "Answer: " } },
+          { type: "markdown_delta", payload: { delta: body.message } },
+          { type: "artifact", payload: { type: "table", payload: { columns: ["wins"], rows: [{ wins: 8 }] } } },
+          { type: "complete", payload: {} },
+        ]);
       }
       return jsonResponse([]);
     });
@@ -39,13 +46,14 @@ describe("App", () => {
     await user.type(composer, "Show Brier results");
     await user.keyboard("{Enter}");
     await screen.findByText("Answer: Show Brier results");
+    expect(screen.getByRole("columnheader", { name: "wins" })).toBeInTheDocument();
 
     await user.type(composer, "Only after 2020");
     await user.keyboard("{Enter}");
     await screen.findByText("Answer: Only after 2020");
 
     const chatBodies = fetchMock.mock.calls
-      .filter(([url]) => url === "/api/chat")
+      .filter(([url]) => url === "/api/chat/stream")
       .map(([, init]) => JSON.parse(String(init?.body)));
     expect(chatBodies).toEqual([
       { message: "Show Brier results" },

@@ -2,19 +2,24 @@
 
 ## Overview
 
-The CurlChat frontend is a React, TypeScript, and Vite single-page application in `frontend`. It presents the existing synchronous FastAPI contract as a chat-first analytics experience. Streaming is intentionally not part of this implementation.
+The CurlChat frontend is a React, TypeScript, and Vite single-page application in `frontend`. It presents a chat-first analytics experience using the synchronous API as a fallback and the streaming API for active turns.
 
 ## Responsibilities
 
 The frontend owns presentation and browser-local interaction state only:
 
 * fetches conversation metadata from `GET /api/conversations`
-* sends messages to `POST /api/chat`
+* sends active messages to `POST /api/chat/stream` and consumes its SSE response
 * retains the returned conversation UUID for subsequent messages
 * renders the response block contract: Markdown, tables, summaries, and Plotly charts
 * exposes loading, API-unavailable, and configuration-error feedback
 
 It does not implement player resolution, query logic, or visualization construction.
+
+During an active turn, Markdown deltas update one in-progress assistant
+message. Completed table, summary, and chart artifacts append atomically to
+that message. The synchronous endpoint remains available in the API client for
+non-streaming callers.
 
 ## Conversation Behavior
 

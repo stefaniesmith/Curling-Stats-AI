@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import logoUrl from "../../../assets/CurlChatLogo.png";
-import { ApiError, getConversationMessages, listConversations, sendMessage } from "../lib/api";
+import { ApiError, getConversationMessages, listConversations, streamMessage } from "../lib/api";
 import { ResponseBlocks } from "../features/visualizations/ResponseBlocks";
 import type { Conversation, ResponseBlock } from "../types/api";
 
@@ -85,10 +85,53 @@ export function App() {
     setError(undefined);
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: trimmed }]);
     setIsSending(true);
+    const assistantMessageId = crypto.randomUUID();
+    const appendAssistantBlock = (block: ResponseBlock) => {
+      setMessages((current) => {
+        const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
+        if (assistantIndex === -1) {
+          return [...current, { id: assistantMessageId, role: "assistant", blocks: [block] }];
+        }
+        return current.map((item, index) => index === assistantIndex
+          ? { ...item, blocks: [...(item.blocks ?? []), block] }
+          : item);
+      });
+    };
     try {
-      const response = await sendMessage({ message: trimmed, conversation_id: activeConversationId });
-      setActiveConversationId(response.conversation_id);
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", blocks: response.blocks }]);
+      await streamMessage({ message: trimmed, conversation_id: activeConversationId }, (event) => {
+        if (event.type === "message_start") {
+          setActiveConversationId(event.payload.conversation_id);
+        } else if (event.type === "markdown_delta") {
+          setMessages((current) => {
+            const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
+            if (assistantIndex === -1) {
+              return [...current, {
+                id: assistantMessageId,
+                role: "assistant",
+                blocks: [{ type: "markdown", payload: { content: event.payload.delta } }],
+              }];
+            }
+            return current.map((item, index) => {
+              if (index !== assistantIndex) return item;
+              const blocks = [...(item.blocks ?? [])];
+              const markdownIndex = blocks.findIndex((block) => block.type === "markdown");
+              if (markdownIndex >= 0) {
+                const markdown = blocks[markdownIndex];
+                blocks[markdownIndex] = {
+                  ...markdown,
+                  payload: {
+                    ...markdown.payload,
+                    content: `${String(markdown.payload.content ?? "")}${event.payload.delta}`,
+                  },
+                };
+              } else blocks.unshift({ type: "markdown", payload: { content: event.payload.delta } });
+              return { ...item, blocks };
+            });
+          });
+        } else if (event.type === "artifact") {
+          appendAssistantBlock({ type: event.payload.type, payload: event.payload.payload });
+        }
+      });
       await refreshConversations();
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : new ApiError("CurlChat could not answer that question.");

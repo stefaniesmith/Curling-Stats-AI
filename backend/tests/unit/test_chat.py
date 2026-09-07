@@ -6,6 +6,7 @@ from curlchat.agent.graph.app_graph import (
     AgentConfigurationError,
     AgentInvocationError,
     AgentResponse,
+    AgentStreamEvent,
 )
 from curlchat.main import app
 from curlchat.services.conversation_service import ConversationMetadata, ConversationNotFoundError
@@ -109,3 +110,29 @@ def test_chat_rejects_unknown_conversation(monkeypatch) -> None:
 
     assert response.status_code == 404
     assert response.json() == {"detail": "The requested conversation does not exist."}
+
+
+def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
+    service = _install_conversation_service(monkeypatch)
+    monkeypatch.setattr(
+        "curlchat.api.routes.chat.stream_response",
+        lambda *_: iter(
+            [
+                AgentStreamEvent(type="markdown_delta", payload={"delta": "Here "}),
+                AgentStreamEvent(type="artifact", payload={"type": "table", "payload": {"rows": []}}),
+                AgentStreamEvent(type="complete"),
+            ]
+        ),
+    )
+
+    response = client.post("/api/chat/stream", json={"message": "Show stats"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.text == (
+        f"event: message_start\ndata: {{\"conversation_id\": \"{service.metadata.id}\"}}\n\n"
+        "event: markdown_delta\ndata: {\"delta\": \"Here \"}\n\n"
+        "event: artifact\ndata: {\"type\": \"table\", \"payload\": {\"rows\": []}}\n\n"
+        "event: complete\ndata: {}\n\n"
+    )
+    assert service.touched == [service.metadata.id]
