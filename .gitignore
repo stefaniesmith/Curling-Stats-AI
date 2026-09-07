@@ -40,3 +40,4 @@ coverage/
 # Local databases and docker state
 *.sqlite3
 *.db
+.archive/

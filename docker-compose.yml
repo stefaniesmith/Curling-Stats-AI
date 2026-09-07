@@ -29,6 +29,62 @@ services:
     volumes:
       - phoenix_data:/mnt/data
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://curlchat_app:${POSTGRES_PASSWORD:-curlchat}@postgres:5432/${POSTGRES_DB:-curlchat}
+      STATE_DATABASE_URL: postgresql+psycopg://curlchat_state:${POSTGRES_PASSWORD:-curlchat}@postgres:5432/${POSTGRES_DB:-curlchat}
+      ADMIN_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-curlchat_owner}:${POSTGRES_PASSWORD:-curlchat}@postgres:5432/${POSTGRES_DB:-curlchat}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      PHOENIX_TRACING_ENABLED: ${PHOENIX_TRACING_ENABLED:-false}
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
+      PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-curlchat}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  importer:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    profiles: ["import"]
+    command: ["sh", "/app/docker/import-archive.sh"]
+    environment:
+      ADMIN_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-curlchat_owner}:${POSTGRES_PASSWORD:-curlchat}@postgres:5432/${POSTGRES_DB:-curlchat}
+      DATABASE_URL: postgresql+psycopg://curlchat_app:${POSTGRES_PASSWORD:-curlchat}@postgres:5432/${POSTGRES_DB:-curlchat}
+      STATE_DATABASE_URL: postgresql+psycopg://curlchat_state:${POSTGRES_PASSWORD:-curlchat}@postgres:5432/${POSTGRES_DB:-curlchat}
+    volumes:
+      - ${ARCHIVE_PATH:-./.archive}:/archive:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   phoenix_data:

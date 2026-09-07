@@ -78,6 +78,18 @@ uv run python scripts/provision_app_role.py
 uv run python -m curlchat.ingest.cli --source /path/to/curling-canada-stats-archive
 ```
 
+For the repository's Docker Compose setup, clone the public archive separately,
+set its absolute checkout path as `ARCHIVE_PATH` in `.env`, and run the
+one-time importer profile:
+
+```bash
+docker compose --profile import run --rm importer
+```
+
+Compose mounts that source at `/archive` as read-only. The importer performs
+the same migration, role provisioning, and transactional import sequence; it
+does not bundle, download, or modify archive data.
+
 ---
 
 ## Player Import

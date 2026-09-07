@@ -40,7 +40,7 @@ Charts are rendered by Plotly in the browser. The backend Visualization Service 
 
 ## Development
 
-Run the FastAPI backend on port 8000, then from `frontend` run `pnpm install` and `pnpm dev`. Vite proxies `/api` to `http://localhost:8000`; `VITE_API_TARGET` can override the target for local development. Production hosting should supply an equivalent reverse proxy or an explicit API base URL.
+Run the FastAPI backend on port 8000, then from `frontend` run `pnpm install` and `pnpm dev`. Vite proxies `/api` to `http://localhost:8000`; `VITE_API_TARGET` can override the target for local development. The local Docker Compose stack builds this application with Vite and serves the output from an Nginx container. Nginx proxies `/api` to FastAPI and disables buffering for `/api/chat/stream`, preserving incremental SSE delivery without exposing a second browser-facing API origin.
 
 The canonical brand asset is `assets/CurlChatLogo.png` at the repository root. The welcome state uses the full mark; the sidebar uses a compact crop of that same source asset. Styling draws from its navy, red, and ice-blue palette.
 

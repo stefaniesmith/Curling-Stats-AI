@@ -109,6 +109,32 @@ Each layer communicates only with the layer directly below it.
 
 Lower layers never depend on higher layers.
 
+## Local Portfolio Distribution
+
+The repository includes a Docker Compose configuration intended for local review.
+It packages the browser-facing frontend separately from the backend while keeping
+the production-style boundary visible:
+
+```text
+Browser
+  │ http://localhost:5173
+  ▼
+Nginx frontend container
+  │ serves the Vite production build
+  │ proxies /api and /api/chat/stream
+  ▼
+FastAPI backend container ─────────► PostgreSQL container
+  │
+  └────────────────────────────────► Phoenix container (optional tracing)
+```
+
+Nginx disables proxy buffering for the streaming route so Server-Sent Events
+reach the browser incrementally. In development, Vite may run directly on the
+host instead; its development proxy has the same `/api` contract. The archive
+importer is a Compose profile rather than a long-running service. It mounts a
+separately cloned archive checkout read-only and writes through the owner
+connection, while the running API continues to use restricted runtime roles.
+
 ---
 
 # Application Layers
