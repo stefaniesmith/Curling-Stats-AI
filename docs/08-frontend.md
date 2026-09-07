@@ -38,3 +38,5 @@ Charts are rendered by Plotly in the browser. The backend Visualization Service 
 Run the FastAPI backend on port 8000, then from `frontend` run `pnpm install` and `pnpm dev`. Vite proxies `/api` to `http://localhost:8000`; `VITE_API_TARGET` can override the target for local development. Production hosting should supply an equivalent reverse proxy or an explicit API base URL.
 
 The canonical brand asset is `assets/CurlChatLogo.png` at the repository root. The welcome state uses the full mark; the sidebar uses a compact crop of that same source asset. Styling draws from its navy, red, and ice-blue palette.
+
+Frontend component and interaction tests use Vitest, jsdom, and React Testing Library. See `docs/10-testing.md` for the covered behavior and commands.
