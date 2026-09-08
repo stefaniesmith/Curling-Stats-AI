@@ -1,3 +1,5 @@
+import json
+
 from pydantic import SecretStr
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -123,7 +125,7 @@ def test_preserves_each_resolved_event_name_and_id() -> None:
     assert generator.calls == [("Show Brier statistics", (), (event,), None)]
 
 
-def test_retries_once_after_execution_failure_with_sanitized_error() -> None:
+def test_retries_once_after_execution_failure_with_query_and_database_context() -> None:
     generator = SequenceGenerator(
         [
             GeneratedAnalyticsQuery(
@@ -145,15 +147,13 @@ def test_retries_once_after_execution_failure_with_sanitized_error() -> None:
 
     assert result.status is AnalyticsQueryStatus.SUCCESS
     assert result.rows == ({"display_name": "Brad Gushue"},)
-    assert generator.calls == [
-        ("Show Brad Gushue", (player,), (), None),
-        (
-            "Show Brad Gushue",
-            (player,),
-            (),
-            "The analytics query could not be executed.",
-        ),
-    ]
+    assert generator.calls[0] == ("Show Brad Gushue", (player,), (), None)
+    assert generator.calls[1][:3] == ("Show Brad Gushue", (player,), ())
+    assert json.loads(generator.calls[1][3]) == {
+        "previous_sql": "SELECT missing_column FROM players WHERE id = :player_id",
+        "previous_parameters": {"player_id": 1},
+        "database_error": "no such column: missing_column",
+    }
 
 
 def test_returns_execution_failure_after_one_unsuccessful_repair_attempt() -> None:
@@ -217,6 +217,12 @@ def test_sql_generation_prompt_requires_named_bind_parameters() -> None:
     assert "SQLAlchemy-style named bound parameters" in prompt
     assert "positional placeholders such as `$1`" in prompt
     assert "authoritative `display_name`/ID pairs" in prompt
+    assert "event ID identifies a competition across its imported history" in prompt
+    assert "pes.event_year = :event_year" in prompt
+    assert "Never omit, broaden, or silently reinterpret an explicit temporal constraint" in prompt.replace(
+        "\n", " "
+    )
+    assert "Event Resolver intentionally ignores year tokens" in prompt
     assert "ORDER BY metric DESC NULLS LAST" in prompt
     assert "`NULL` means the archive does not provide that value" in prompt
     assert "alternate IS NOT TRUE" in prompt.replace("\n", " ")
@@ -248,6 +254,44 @@ def test_sql_generator_uses_function_calling_structured_output(monkeypatch) -> N
 
     monkeypatch.setattr(analytics_query_graph, "ChatOpenAI", fake_chat_model)
 
-    OpenAISqlGenerator(Settings(openai_api_key=SecretStr("test-key")), "test schema")
+    OpenAISqlGenerator(
+        Settings(
+            openai_api_key=SecretStr("test-key"),
+            openai_model="test-model",
+            openai_sql_max_completion_tokens=2000,
+        ),
+        "test schema",
+    )
 
     assert captured["structured_output"] == {"method": "function_calling"}
+    assert captured["model"] == {
+        "model": "test-model",
+        "api_key": "test-key",
+        "temperature": 0,
+        "max_completion_tokens": 2000,
+    }
+
+
+def test_sql_generator_adds_reasoning_effort_for_gpt_5_models(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeModel:
+        def with_structured_output(self, schema: object, **kwargs: object) -> object:
+            return object()
+
+    monkeypatch.setattr(
+        analytics_query_graph,
+        "ChatOpenAI",
+        lambda **kwargs: captured.update(kwargs) or FakeModel(),
+    )
+
+    OpenAISqlGenerator(
+        Settings(
+            openai_api_key=SecretStr("test-key"),
+            openai_model="gpt-5-mini",
+            openai_sql_reasoning_effort="minimal",
+        ),
+        "test schema",
+    )
+
+    assert captured["reasoning_effort"] == "minimal"

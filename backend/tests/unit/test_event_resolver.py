@@ -5,6 +5,7 @@ from curlchat.agent.tools.event_resolver import resolve_event_name
 from curlchat.core.identities import ResolvedPlayerIdentity
 from curlchat.db.models import Event, Player, PlayerEventStatistics
 from curlchat.db.session import Base
+from curlchat.repositories.events import EventRepository
 from curlchat.services.event_resolver import EventResolutionStatus
 
 
@@ -53,6 +54,14 @@ def test_exact_event_name_beats_a_broader_shorthand_match() -> None:
     assert resolution.event is not None
     assert resolution.event.display_name == "Brier"
     assert resolution.event.confidence == 1.0
+
+
+def test_reads_canonical_event_names_by_id() -> None:
+    session, _ = _session_with_events()
+    with session:
+        names = EventRepository(session).display_names_by_id((1, 3, 999))
+
+    assert names == {1: "Macdonald Brier", 3: "Hearts"}
 
 
 def test_ignores_a_year_in_an_event_phrase() -> None:

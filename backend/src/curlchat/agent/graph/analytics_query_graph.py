@@ -64,12 +64,17 @@ class OpenAISqlGenerator:
         if settings.openai_api_key is None:
             raise ValueError("OPENAI_API_KEY is not configured.")
         self._schema_description = schema_description
-        self._model = ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key.get_secret_value(),
-            temperature=0,
-            max_completion_tokens=600,
-        ).with_structured_output(GeneratedAnalyticsQuery, method="function_calling")
+        model_arguments: dict[str, object] = {
+            "model": settings.openai_model,
+            "api_key": settings.openai_api_key.get_secret_value(),
+            "temperature": 0,
+            "max_completion_tokens": settings.openai_sql_max_completion_tokens,
+        }
+        if settings.openai_model.startswith("gpt-5"):
+            model_arguments["reasoning_effort"] = settings.openai_sql_reasoning_effort
+        self._model = ChatOpenAI(**model_arguments).with_structured_output(
+            GeneratedAnalyticsQuery, method="function_calling"
+        )
 
     def generate(
         self,
@@ -206,7 +211,16 @@ class AnalyticsQueryWorkflow:
             }
         updates: dict[str, object] = {"result": result, "retryable": retryable}
         if retryable and state.retry_count < 1:
-            updates["repair_error"] = result.message or "The previous query could not run."
+            updates["repair_error"] = json.dumps(
+                {
+                    "previous_sql": generated_query.sql,
+                    "previous_parameters": generated_query.parameters,
+                    "database_error": result.repair_error
+                    or result.message
+                    or "The previous query could not run.",
+                },
+                default=str,
+            )
         return updates
 
     @staticmethod

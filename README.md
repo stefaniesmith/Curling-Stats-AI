@@ -39,6 +39,15 @@ OPENAI_API_KEY=your-key
 ARCHIVE_PATH=/absolute/path/to/curling-canada-stats-archive
 ```
 
+`OPENAI_AGENT_MAX_COMPLETION_TOKENS` and `OPENAI_SQL_MAX_COMPLETION_TOKENS`
+independently control the model completion budgets for the conversational agent
+and structured SQL generator. `OPENAI_AGENT_REASONING_EFFORT` and
+`OPENAI_SQL_REASONING_EFFORT` independently control their reasoning depth. The
+completion-token defaults are 800 and 600. Reasoning-effort settings apply only
+to GPT-5-family models; `gpt-4.1-mini` receives no reasoning-effort parameter.
+`ANALYTICS_STATEMENT_TIMEOUT_MS` defaults to 5000 and limits each generated
+analytics statement at the PostgreSQL server.
+
 Build and start the application stack, then load the archive once:
 
 ```bash

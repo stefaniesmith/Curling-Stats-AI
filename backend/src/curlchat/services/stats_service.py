@@ -7,13 +7,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
-from sqlglot import exp, parse
-from sqlglot.errors import ParseError
 
 from curlchat.repositories.analytics import AnalyticsRepository
 
-_ALLOWED_TABLES = frozenset({"players", "events", "player_event_statistics"})
 _MAXIMUM_ROWS = 500
+_STATEMENT_TIMEOUT_MS = 5_000
 
 
 class AnalyticsQueryStatus(StrEnum):
@@ -32,23 +30,32 @@ class AnalyticsQueryResult(BaseModel):
     rows: tuple[dict[str, Any], ...] = Field(default_factory=tuple)
     truncated: bool = False
     message: str | None = None
+    repair_error: str | None = None
 
 
 class StatsService:
-    """Run validated, read-only SQL against CurlChat analytics data."""
+    """Execute one analytics statement through the restricted database role."""
 
-    def __init__(self, repository: AnalyticsRepository, row_limit: int = _MAXIMUM_ROWS) -> None:
+    def __init__(
+        self,
+        repository: AnalyticsRepository,
+        row_limit: int = _MAXIMUM_ROWS,
+        statement_timeout_ms: int = _STATEMENT_TIMEOUT_MS,
+    ) -> None:
         if row_limit < 1:
             raise ValueError("row_limit must be at least one.")
+        if statement_timeout_ms < 1:
+            raise ValueError("statement_timeout_ms must be at least one.")
         self._repository = repository
         self._row_limit = row_limit
+        self._statement_timeout_ms = statement_timeout_ms
 
     def execute(
         self, sql: str, parameters: dict[str, Any] | None = None
     ) -> AnalyticsQueryResult:
-        """Validate and execute one SQL SELECT statement with bound parameters."""
+        """Execute one statement with bound parameters and bounded resource use."""
         try:
-            validated_sql = self._validated_sql(sql)
+            validated_sql = self._single_statement_sql(sql)
         except QueryValidationError as error:
             return AnalyticsQueryResult(
                 status=AnalyticsQueryStatus.UNSUPPORTED, message=str(error)
@@ -56,12 +63,16 @@ class StatsService:
 
         try:
             columns, rows, truncated = self._repository.execute(
-                validated_sql, parameters or {}, self._row_limit
+                validated_sql,
+                parameters or {},
+                self._row_limit,
+                self._statement_timeout_ms,
             )
-        except SQLAlchemyError:
+        except SQLAlchemyError as error:
             return AnalyticsQueryResult(
                 status=AnalyticsQueryStatus.EXECUTION_FAILURE,
                 message="The analytics query could not be executed.",
+                repair_error=_database_error_for_repair(error),
             )
         return AnalyticsQueryResult(
             status=AnalyticsQueryStatus.SUCCESS,
@@ -71,7 +82,7 @@ class StatsService:
         )
 
     @staticmethod
-    def _validated_sql(sql: str) -> str:
+    def _single_statement_sql(sql: str) -> str:
         validated_sql = sql.strip()
         if validated_sql.endswith(";"):
             validated_sql = validated_sql[:-1].rstrip()
@@ -79,55 +90,20 @@ class StatsService:
             raise QueryValidationError("An analytics query is required.")
         if ";" in validated_sql:
             raise QueryValidationError("Exactly one analytics query is allowed without a semicolon.")
-        try:
-            statements = parse(validated_sql, read="postgres")
-        except ParseError as error:
-            raise QueryValidationError("The analytics query is not valid PostgreSQL SQL.") from error
-        if len(statements) != 1:
-            raise QueryValidationError("Exactly one analytics query is allowed.")
-
-        statement = statements[0]
-        if not isinstance(statement, (exp.Select, exp.Union, exp.Intersect, exp.Except)):
-            raise QueryValidationError("Only read-only SELECT queries are supported.")
-        forbidden_expression = next(
-            (
-                expression
-                for expression in statement.walk()
-                if isinstance(
-                    expression,
-                    (
-                        exp.Delete,
-                        exp.Insert,
-                        exp.Update,
-                        exp.Create,
-                        exp.Drop,
-                        exp.Alter,
-                        exp.Command,
-                    ),
-                )
-            ),
-            None,
-        )
-        if forbidden_expression is not None:
-            raise QueryValidationError("Only read-only SELECT queries are supported.")
-
-        tables = tuple(statement.find_all(exp.Table))
-        if not tables:
-            raise QueryValidationError("Analytics queries must read from an approved analytics table.")
-        disallowed_table = next(
-            (
-                table
-                for table in tables
-                if table.name.casefold() not in _ALLOWED_TABLES or table.db
-            ),
-            None,
-        )
-        if disallowed_table is not None:
-            raise QueryValidationError(
-                "Analytics queries may only read players, events, and player_event_statistics."
-            )
         return validated_sql
 
 
 class QueryValidationError(ValueError):
-    """A query violated the analytics tool's read-only contract."""
+    """A query violates the single-statement analytics-tool contract."""
+
+
+def _database_error_for_repair(error: SQLAlchemyError) -> str:
+    """Extract a concise database diagnostic without exposing it to the user."""
+    original_error = getattr(error, "orig", None)
+    diagnostics = getattr(original_error, "diag", None)
+    primary_message = getattr(diagnostics, "message_primary", None)
+    sqlstate = getattr(diagnostics, "sqlstate", None)
+    if primary_message:
+        prefix = f"PostgreSQL error {sqlstate}: " if sqlstate else "PostgreSQL error: "
+        return f"{prefix}{primary_message}"[:500]
+    return str(original_error or error).splitlines()[0][:500]

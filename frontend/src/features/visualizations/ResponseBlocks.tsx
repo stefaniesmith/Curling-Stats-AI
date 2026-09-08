@@ -20,11 +20,26 @@ function wrapChartTitle(title: string, maxCharacters = 72) {
   return lines.join("<br>");
 }
 
+const decimalString = /^-?\d+\.\d+$/;
+
+const displayNumber = (value: number) =>
+  Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2).replace(/\.00$/, "");
+
 const displayValue = (value: unknown) => {
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2).replace(/\.00$/, "");
+  if (typeof value === "number") return displayNumber(value);
+  if (typeof value === "string" && decimalString.test(value)) {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) return displayNumber(numericValue);
   }
   return value == null ? "—" : String(value);
+};
+
+const displayAxisLabel = (value: unknown) => {
+  const label = String(value ?? "")
+    .replaceAll("_", " ")
+    .replace(/\binturns?\b/gi, (match) => (match.endsWith("s") ? "in-turns" : "in-turn"))
+    .replace(/\boutturns?\b/gi, (match) => (match.endsWith("s") ? "out-turns" : "out-turn"));
+  return label ? `${label[0].toUpperCase()}${label.slice(1)}` : "";
 };
 
 function TableBlock({ payload }: { payload: Record<string, unknown> }) {
@@ -105,10 +120,14 @@ function ChartBlock({ payload }: { payload: Record<string, unknown> }) {
           plot_bgcolor: "rgba(234,244,251,0.6)",
           font: { family: "Inter, system-ui, sans-serif", color: "#19325d" },
           xaxis: {
-            title: { text: String(payload.x_column ?? ""), standoff: 18 },
+            title: { text: displayAxisLabel(payload.x_column), standoff: 18 },
             gridcolor: "rgba(7,31,79,.08)",
           },
-          yaxis: { title: String(payload.y_column ?? ""), gridcolor: "rgba(7,31,79,.1)", zerolinecolor: "rgba(7,31,79,.2)" },
+          yaxis: {
+            title: displayAxisLabel(payload.y_column),
+            gridcolor: "rgba(7,31,79,.1)",
+            zerolinecolor: "rgba(7,31,79,.2)",
+          },
           barmode: payload.bar_mode === "group" ? "group" : undefined,
           showlegend: hasLegend,
           legend: { orientation: "h", x: 0, xanchor: "left", y: -0.46, yanchor: "top" },

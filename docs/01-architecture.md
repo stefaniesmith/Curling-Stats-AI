@@ -234,7 +234,7 @@ Responsible for:
 
 Responsible for:
 
-* Executing validated analytical SQL
+* Executing bounded analytical SQL through the restricted runtime role
 * Returning structured statistical results
 
 ### VisualizationService

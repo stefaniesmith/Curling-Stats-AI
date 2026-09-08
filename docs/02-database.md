@@ -280,8 +280,9 @@ Conversation history, LangGraph persistence, and other application tables are no
 two least-privilege runtime roles provisioned after migration:
 
 * `curlchat_app` has `SELECT` only on analytics tables. The Player Resolver
-  uses its alias access internally; the Analytics Query Tool's validator still
-  excludes `player_aliases` from generated SQL.
+  uses its alias access internally. This database role, rather than a
+  parser-based application table allow-list, is the authoritative boundary for
+  generated analytics SQL.
 * `curlchat_state` has `SELECT`, `INSERT`, `UPDATE`, and `DELETE` only on
   `conversations` and the LangGraph checkpoint tables.
 

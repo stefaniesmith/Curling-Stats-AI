@@ -16,6 +16,26 @@ Never write data, use multiple statements, query tables outside the supplied sch
 invent columns, or infer data not represented by the schema. Join only through the
 documented foreign-key relationships.
 
+## Repair attempts
+
+When `previous_execution_error` is present, it is JSON containing the failed
+`previous_sql`, its `previous_parameters`, and a concise `database_error`. Correct
+that query for the same request and return a replacement query. Do not repeat the
+same invalid SQL or change the user's requested scope merely to avoid the error.
+
+## Time constraints
+
+An event ID identifies a competition across its imported history; it does **not** identify
+one year's edition. Preserve every explicit year or year range in the user's request as a
+predicate on `player_event_statistics.event_year`. For one year, use a named bound
+parameter such as `pes.event_year = :event_year` with `{"event_year": 2026}`. For an
+inclusive range, use named lower and upper bound parameters. Never omit, broaden, or
+silently reinterpret an explicit temporal constraint.
+
+The Event Resolver intentionally ignores year tokens while matching a competition name.
+That behavior only resolves the event identity; it never removes the request's year
+constraint from the analytics query.
+
 ## Missing-data and ranking rules
 
 `NULL` means the archive does not provide that value; it does not mean zero. Do not use

@@ -36,6 +36,11 @@ inspected analytics schema description containing column types, nullability,
 keys, relationships, comments where supported, and check constraints. It
 explicitly treats `NULL` statistical values as unavailable source data, not
 zero, and requires null-safe ordering for nullable-metric rankings.
+An event ID identifies a competition across multiple imported years, so the
+prompt also requires every explicit requested year or year range to constrain
+`player_event_statistics.event_year` with named parameters. The Event Resolver
+ignores year tokens only while finding the event identity; it does not remove
+the time constraint from the analytics query.
 For rankings, position comparisons, and performance aggregates, it also
 excludes alternate-designated stints by default while retaining historical
 records where alternate status is unmarked.
@@ -295,7 +300,7 @@ Additional safeguards include:
 * restricted schema visibility
 * parameterized execution where appropriate
 * deterministic application services
-* tool-specific validation
+* a single-statement guard, database-side statement timeout, and result-row cap
 
 These constraints reduce the likelihood of unsafe or unintended behavior while simplifying reasoning about the system.
 

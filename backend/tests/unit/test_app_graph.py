@@ -37,7 +37,11 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(app_graph, "competition_catalog_prompt", lambda: catalog)
 
     graph = app_graph.build_graph(
-        Settings(openai_api_key=SecretStr("test-key"), openai_model="test-model")
+        Settings(
+            openai_api_key=SecretStr("test-key"),
+            openai_model="test-model",
+            openai_agent_max_completion_tokens=1600,
+        )
     )
 
     assert graph == "graph"
@@ -45,7 +49,7 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
         "model": "test-model",
         "api_key": "test-key",
         "temperature": 0,
-        "max_completion_tokens": 800,
+        "max_completion_tokens": 1600,
     }
     assert captured["graph"] == {
         "model": "model",
@@ -73,6 +77,7 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert query_schema["properties"]["request"]["description"] == (
         "The user's analytical question in natural language, never SQL."
     )
+
     assert "Successful Player Resolver results only" in query_schema["properties"]["resolved_players"][
         "description"
     ]
@@ -101,6 +106,28 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
         "A typed table, summary, or chart specification for the latest successful analytics "
         "result. Select columns and mappings only; do not pass or reproduce result rows."
     )
+
+
+def test_build_graph_adds_reasoning_effort_for_gpt_5_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        app_graph, "ChatOpenAI", lambda **kwargs: captured.update(kwargs) or "model"
+    )
+    monkeypatch.setattr(app_graph, "create_react_agent", lambda **_: "graph")
+    monkeypatch.setattr(app_graph, "competition_catalog_prompt", lambda: "Competition catalog")
+
+    app_graph.build_graph(
+        Settings(
+            openai_api_key=SecretStr("test-key"),
+            openai_model="gpt-5-mini",
+            openai_agent_reasoning_effort="low",
+        )
+    )
+
+    assert captured["reasoning_effort"] == "low"
 
 
 def test_build_graph_adds_a_checkpointer_when_supplied(monkeypatch: pytest.MonkeyPatch) -> None:

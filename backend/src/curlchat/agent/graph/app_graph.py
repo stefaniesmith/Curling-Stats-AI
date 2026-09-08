@@ -85,12 +85,15 @@ def build_graph(
     configured_settings = settings or get_settings()
     if configured_settings.openai_api_key is None:
         raise AgentConfigurationError("OPENAI_API_KEY is not configured.")
-    model = ChatOpenAI(
-        model=configured_settings.openai_model,
-        api_key=configured_settings.openai_api_key.get_secret_value(),
-        temperature=0,
-        max_completion_tokens=800,
-    )
+    model_arguments: dict[str, object] = {
+        "model": configured_settings.openai_model,
+        "api_key": configured_settings.openai_api_key.get_secret_value(),
+        "temperature": 0,
+        "max_completion_tokens": configured_settings.openai_agent_max_completion_tokens,
+    }
+    if configured_settings.openai_model.startswith("gpt-5"):
+        model_arguments["reasoning_effort"] = configured_settings.openai_agent_reasoning_effort
+    model = ChatOpenAI(**model_arguments)
     system_prompt = main_agent_system_prompt(competition_catalog_prompt())
     graph_arguments: dict[str, Any] = {
         "model": model,

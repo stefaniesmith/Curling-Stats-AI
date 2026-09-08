@@ -90,3 +90,33 @@ def test_visualization_reads_typed_latest_result_from_state() -> None:
 
     payload = json.loads(update["messages"][-1].content)["payload"]
     assert payload["points"] == [{"x": "Ben Hebert", "y": 95.0}]
+
+
+def test_visualization_returns_a_concise_error_for_an_unwrapped_spec() -> None:
+    update = _run_tool(
+        create_visualization,
+        {
+            "messages": [
+                _tool_call(
+                    "create_visualization",
+                    {
+                        "type": "chart",
+                        "chart_type": "bar",
+                        "data_mapping": {
+                            "format": "long",
+                            "x_column": "display_name",
+                            "y_column": "draw_percentage",
+                        },
+                    },
+                )
+            ],
+            "latest_analytics_result": {
+                "columns": ("display_name", "draw_percentage"),
+                "rows": ({"display_name": "Ben Hebert", "draw_percentage": Decimal("95.0")},),
+            },
+        },
+    )
+
+    assert json.loads(update["messages"][-1].content) == {
+        "error": "Invalid visualization request. Pass the chart, table, or summary object as `spec`."
+    }

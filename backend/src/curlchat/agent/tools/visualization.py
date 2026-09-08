@@ -6,7 +6,7 @@ from typing import Annotated, Any
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from curlchat.services.visualization_service import (
     AnalyticsResultData,
@@ -20,6 +20,13 @@ class VisualizationToolError(BaseModel):
     """A recoverable reason an artifact could not be constructed."""
 
     error: str
+
+
+def _visualization_validation_error(_: ValidationError) -> str:
+    """Return a recoverable tool response when the model omits the spec wrapper."""
+    return VisualizationToolError(
+        error="Invalid visualization request. Pass the chart, table, or summary object as `spec`."
+    ).model_dump_json()
 
 
 def create_visualization_from_result(
@@ -54,3 +61,6 @@ def create_visualization(
     latest_result = state.get("latest_analytics_result")
     result = AnalyticsResultData.model_validate(latest_result) if latest_result is not None else None
     return create_visualization_from_result(result, spec)
+
+
+create_visualization.handle_validation_error = _visualization_validation_error

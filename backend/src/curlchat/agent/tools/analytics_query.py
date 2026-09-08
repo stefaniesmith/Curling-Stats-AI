@@ -17,6 +17,8 @@ from curlchat.agent.graph.analytics_query_graph import (
 from curlchat.core.identities import ResolvedEventIdentity, ResolvedPlayerIdentity
 from curlchat.db.session import SessionLocal, get_settings
 from curlchat.repositories.analytics import AnalyticsRepository
+from curlchat.repositories.events import EventRepository
+from curlchat.repositories.players import PlayerRepository
 from curlchat.services.stats_service import AnalyticsQueryResult, AnalyticsQueryStatus, StatsService
 
 
@@ -47,11 +49,64 @@ def run_analytics_query(
 ) -> AnalyticsQueryResult:
     """Run the deterministic analytics workflow behind the agent tool."""
     with SessionLocal() as session:
+        try:
+            _validate_resolved_players(PlayerRepository(session), resolved_players or ())
+            _validate_resolved_events(EventRepository(session), resolved_events or ())
+        except ResolvedIdentityMismatchError as error:
+            return AnalyticsQueryResult(status=AnalyticsQueryStatus.UNSUPPORTED, message=str(error))
+        settings = get_settings()
         workflow = AnalyticsQueryWorkflow(
-            StatsService(AnalyticsRepository(session)),
-            OpenAISqlGenerator(get_settings(), analytics_schema_description(session.get_bind())),
+            StatsService(
+                AnalyticsRepository(session),
+                statement_timeout_ms=settings.analytics_statement_timeout_ms,
+            ),
+            OpenAISqlGenerator(settings, analytics_schema_description(session.get_bind())),
         )
         return workflow.query(request, resolved_players or (), resolved_events or ())
+
+
+def _validate_resolved_events(
+    repository: EventRepository,
+    resolved_events: list[ResolvedEventIdentity] | tuple[ResolvedEventIdentity, ...],
+) -> None:
+    """Reject fabricated or inconsistent Event Resolver identity pairs."""
+    canonical_names = repository.display_names_by_id(tuple(event.event_id for event in resolved_events))
+    for event in resolved_events:
+        canonical_name = canonical_names.get(event.event_id)
+        if canonical_name is None:
+            raise ResolvedIdentityMismatchError(
+                f"The resolved event ID {event.event_id} does not exist. Resolve the event before querying."
+            )
+        if canonical_name != event.display_name:
+            raise ResolvedIdentityMismatchError(
+                f"Resolved event mismatch: ID {event.event_id} is {canonical_name!r}, "
+                f"not {event.display_name!r}. Resolve the event before querying."
+            )
+
+
+def _validate_resolved_players(
+    repository: PlayerRepository,
+    resolved_players: list[ResolvedPlayerIdentity] | tuple[ResolvedPlayerIdentity, ...],
+) -> None:
+    """Reject fabricated or inconsistent Player Resolver identity pairs."""
+    canonical_names = repository.display_names_by_id(
+        tuple(player.player_id for player in resolved_players)
+    )
+    for player in resolved_players:
+        canonical_name = canonical_names.get(player.player_id)
+        if canonical_name is None:
+            raise ResolvedIdentityMismatchError(
+                f"The resolved player ID {player.player_id} does not exist. Resolve the player before querying."
+            )
+        if canonical_name != player.display_name:
+            raise ResolvedIdentityMismatchError(
+                f"Resolved player mismatch: ID {player.player_id} is {canonical_name!r}, "
+                f"not {player.display_name!r}. Resolve the player before querying."
+            )
+
+
+class ResolvedIdentityMismatchError(ValueError):
+    """A claimed resolver result does not match the imported identity catalog."""
 
 
 @tool

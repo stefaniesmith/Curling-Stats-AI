@@ -45,5 +45,30 @@ describe("ResponseBlocks", () => {
     expect(plot).toHaveAttribute("data-colors", "#c7192d,#087e8b");
     expect(plot.getAttribute("data-layout")).toContain("<br>");
     expect(plot.getAttribute("data-layout")).toContain('"b":120');
+    expect(plot.getAttribute("data-layout")).toContain('"text":"Event year"');
+    expect(plot.getAttribute("data-layout")).toContain('"title":"Draw percentage"');
+  });
+
+  it("formats decimal strings from table artifacts as readable numbers", () => {
+    render(
+      <ResponseBlocks
+        blocks={[{
+          type: "table",
+          payload: {
+            columns: ["display_name", "inturn_percentage", "difference"],
+            rows: [{
+              display_name: "Stephen Trickett",
+              inturn_percentage: "71.0000000000000000",
+              difference: "38.1250000000000000",
+            }],
+          },
+        }]}
+      />,
+    );
+
+    expect(screen.getByText("Stephen Trickett")).toBeInTheDocument();
+    expect(screen.getByText("71")).toBeInTheDocument();
+    expect(screen.getByText("38.13")).toBeInTheDocument();
+    expect(screen.queryByText("71.0000000000000000")).not.toBeInTheDocument();
   });
 });

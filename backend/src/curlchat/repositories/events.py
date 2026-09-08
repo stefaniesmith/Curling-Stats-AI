@@ -61,6 +61,16 @@ class EventRepository:
             for event in self._session.scalars(select(Event).order_by(Event.display_name))
         ]
 
+    def display_names_by_id(self, event_ids: tuple[int, ...]) -> dict[int, str]:
+        """Return canonical display names for the supplied event IDs."""
+        if not event_ids:
+            return {}
+        return dict(
+            self._session.execute(
+                select(Event.id, Event.display_name).where(Event.id.in_(event_ids))
+            ).all()
+        )
+
     def event_ids_with_statistics_for_players(
         self, event_ids: tuple[int, ...], player_ids: tuple[int, ...]
     ) -> set[int]:

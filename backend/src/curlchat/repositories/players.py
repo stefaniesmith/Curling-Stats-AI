@@ -34,6 +34,16 @@ class PlayerRepository:
             if record.normalized_name == normalized_name
         ]
 
+    def display_names_by_id(self, player_ids: tuple[int, ...]) -> dict[int, str]:
+        """Return canonical display names for the supplied player IDs."""
+        if not player_ids:
+            return {}
+        return dict(
+            self._session.execute(
+                select(Player.id, Player.display_name).where(Player.id.in_(player_ids))
+            ).all()
+        )
+
     def list_name_records(self) -> list[PlayerNameRecord]:
         """Return all canonical and alias names used for resolver matching."""
         canonical_records = [

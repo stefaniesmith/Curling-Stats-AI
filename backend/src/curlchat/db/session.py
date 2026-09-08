@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     admin_database_url: str = "postgresql+psycopg://curlchat_owner:curlchat@localhost:5432/curlchat"
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-4.1-mini"
+    openai_agent_max_completion_tokens: int = 800
+    openai_sql_max_completion_tokens: int = 600
+    openai_agent_reasoning_effort: str = "low"
+    openai_sql_reasoning_effort: str = "minimal"
+    analytics_statement_timeout_ms: int = 5000
     phoenix_tracing_enabled: bool = False
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "curlchat"

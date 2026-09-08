@@ -210,9 +210,10 @@ This separation allows the internal implementation to evolve independently while
 
 The current implementation invokes a two-node internal LangGraph from the
 agent layer, with Pydantic state: an LLM generation node produces a structured
-query, then a deterministic node validates and executes it. A validation or
-execution failure returns a sanitized error to the generation node for one
-repair attempt. A second failure is returned as an execution failure; a
+query, then a deterministic node checks the one-statement contract and executes
+it. A validation or execution failure returns the failed SQL, bound parameters,
+and a concise database diagnostic to the generation node for one repair attempt;
+the user-facing error remains sanitized. A second failure is returned as an execution failure; a
 model-declared unsupported request does not retry.
 
 ---
@@ -221,13 +222,16 @@ model-declared unsupported request does not retry.
 
 The Analytics Query Tool operates using a read-only database connection.
 
-Database access is limited to the analytics schema, and all requests are validated before execution to prevent unsafe operations.
-
-The initial implementation parses each query, permits exactly one read-only
-`SELECT` statement, restricts table references to `players`, `events`, and
-`player_event_statistics`, binds query parameters separately, and caps returned
-rows. The production database role must also remain read-only as defense in
-depth.
+The database role is the authoritative access boundary: it is read-only and
+has access only to analytics tables. The application accepts one statement per
+request, binds query parameters separately, sets a database-side statement
+timeout, and caps returned rows. It deliberately does not maintain a
+parser-based table allow-list, so ordinary PostgreSQL constructs such as CTEs,
+unions, subqueries, and window functions remain available to generated SQL.
+Before SQL generation, the tool deterministically verifies every supplied
+Player Resolver and Event Resolver display-name/ID pair against the imported
+identity catalogs. A mismatch is rejected rather than querying an identity
+identified by a fabricated ID.
 
 The agent-facing contract accepts an analytical request and resolved player
 identity pairs (`display_name` and `player_id`), not SQL. Keeping each name
