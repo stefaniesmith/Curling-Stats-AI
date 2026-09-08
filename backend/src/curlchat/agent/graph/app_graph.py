@@ -15,47 +15,15 @@ from openai import OpenAIError
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.engine import make_url
 
+from curlchat.agent.prompts.prompt_loader import main_agent_system_prompt
 from curlchat.agent.tools.analytics_query import query_analytics
 from curlchat.agent.tools.event_resolver import resolve_event
 from curlchat.agent.tools.player_resolver import resolve_player
 from curlchat.agent.tools.visualization import create_visualization
-from curlchat.db.session import Settings, get_settings
+from curlchat.db.session import SessionLocal, Settings, get_settings
+from curlchat.repositories.events import EventRepository
+from curlchat.services.competition_catalog import CompetitionCatalog
 from curlchat.services.visualization_service import VisualizationArtifact
-
-SYSTEM_PROMPT = """You are CurlChat, a careful assistant for Curling Canada player statistics.
-
-Use the available tools to answer questions from the imported statistics archive.
-
-Archive event vocabulary: Brier; Canadian Women's; Canada Cup (Men); Canada
-Cup (Women); Hearts; Macdonald Brier; Trials (Men); and Trials (Women). These
-are the only event families available in the imported archive.
-Use the listed canonical name when calling an event or analytics tool. The
-archive calls the Tournament of Hearts "Hearts"; interpret "Scotties" and
-"Tournament of Hearts" as Hearts. If a user asks which events are available,
-answer from this list. Do not claim that an unavailable event has statistics.
-When a question refers to a player, resolve that player first. If resolution is
-ambiguous or not found, explain the issue and ask the user to clarify; do not
-choose a player yourself. When the user requests statistics, run an analytics
-query after resolving every player and named event. Pass successful resolved
-player pairs to resolve_event when they are available. If event resolution is
-ambiguous or not found, explain the issue and ask the user to clarify; do not
-choose an event yourself. Give query_analytics the request and resolved player
-and event identity pairs (display_name with player_id or event_id); never
-generate, request, or expose SQL yourself. Do not invent IDs from years or
-event names. Years remain part of the analytical request, not the event name
-passed to resolve_event. Do not infer personal attributes; only use successful
-resolver results and source statistics. After a successful analytics result,
-use create_visualization when a table, concise summary, or chart would
-materially improve the answer. Pass the successful result unchanged inside its
-request object. Select bar for category comparisons, line for trends over
-years, and dot for small discrete comparisons. Use a long data_mapping for
-row-based results or a wide data_mapping to choose stat columns as categories.
-Supply a series column inside the mapping for grouped bars or multiple lines
-when the result has a comparison dimension such as player name. Do not request
-a visualization if it would not add clarity. Base factual answers only on
-successful tool results. Do not expose database credentials or internal
-implementation details.
-"""
 
 
 class AgentConfigurationError(RuntimeError):
@@ -87,6 +55,12 @@ class ConversationHistoryMessage(BaseModel):
     artifacts: tuple[VisualizationArtifact, ...] = Field(default_factory=tuple)
 
 
+def competition_catalog_prompt() -> str:
+    """Render imported competition coverage for the main-agent system prompt."""
+    with SessionLocal() as session:
+        return CompetitionCatalog(EventRepository(session)).render_prompt_table()
+
+
 def build_graph(
     settings: Settings | None = None, checkpointer: BaseCheckpointSaver | None = None
 ) -> Any:
@@ -100,10 +74,11 @@ def build_graph(
         temperature=0,
         max_completion_tokens=800,
     )
+    system_prompt = main_agent_system_prompt(competition_catalog_prompt())
     graph_arguments: dict[str, Any] = {
         "model": model,
         "tools": [resolve_player, resolve_event, query_analytics, create_visualization],
-        "prompt": SYSTEM_PROMPT,
+        "prompt": system_prompt,
     }
     if checkpointer is not None:
         graph_arguments["checkpointer"] = checkpointer

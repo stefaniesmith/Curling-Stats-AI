@@ -13,6 +13,7 @@ from openai import OpenAIError
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, Engine, inspect
 
+from curlchat.agent.prompts.prompt_loader import sql_generator_system_prompt
 from curlchat.core.identities import ResolvedEventIdentity, ResolvedPlayerIdentity
 from curlchat.db.session import Settings
 from curlchat.services.stats_service import AnalyticsQueryResult, AnalyticsQueryStatus, StatsService
@@ -222,26 +223,45 @@ class AnalyticsQueryWorkflow:
 def analytics_schema_description(bind: Engine | Connection) -> str:
     """Create SQL-model context from live analytics database metadata."""
     inspector = inspect(bind)
-    return "\n".join(
-        f"{table}: " + ", ".join(column["name"] for column in inspector.get_columns(table))
-        for table in _ANALYTICS_TABLES
-    )
+    descriptions: list[str] = []
+    for table in _ANALYTICS_TABLES:
+        columns = inspector.get_columns(table)
+        primary_key = set(inspector.get_pk_constraint(table).get("constrained_columns") or ())
+        foreign_keys = {
+            column: f"{foreign_key['referred_table']}.{foreign_key['referred_columns'][index]}"
+            for foreign_key in inspector.get_foreign_keys(table)
+            for index, column in enumerate(foreign_key["constrained_columns"])
+        }
+        table_comment = _table_comment(inspector, table)
+        heading = table if not table_comment else f"{table} — {table_comment}"
+        lines = [heading]
+        for column in columns:
+            details = [str(column["type"]).upper(), "NULL" if column["nullable"] else "NOT NULL"]
+            if column["name"] in primary_key:
+                details.append("PRIMARY KEY")
+            if reference := foreign_keys.get(column["name"]):
+                details.append(f"REFERENCES {reference}")
+            if default := column.get("default"):
+                details.append(f"DEFAULT {default}")
+            if comment := column.get("comment"):
+                details.append(str(comment))
+            lines.append(f"- {column['name']}: {'; '.join(details)}")
+        for constraint in inspector.get_check_constraints(table):
+            if sqltext := constraint.get("sqltext"):
+                lines.append(f"- CHECK: {sqltext}")
+        descriptions.append("\n".join(lines))
+    return "\n\n".join(descriptions)
+
+
+def _table_comment(inspector: Any, table: str) -> str | None:
+    """Read optional table documentation without requiring every dialect to support it."""
+    try:
+        comment = inspector.get_table_comment(table).get("text")
+    except NotImplementedError:
+        return None
+    return str(comment) if comment else None
 
 
 def sql_generation_prompt(schema_description: str) -> str:
     """Build the SQL model's scoped prompt from live database metadata."""
-    return f"""You generate PostgreSQL SELECT queries for CurlChat's Analytics Query Tool.
-Return a structured result that is either supported with one query and bound parameters,
-or unsupported with a concise reason. Never resolve player names. Each resolved player
-in the request contains an authoritative display_name and player_id pair; preserve that
-mapping, especially when comparing players. Never write data, use multiple statements,
-or query tables outside this schema:
-
-{schema_description}
-
-Join player_event_statistics.player_id to players.id and
-player_event_statistics.event_id to events.id. Resolved player and event identity
-pairs in the request are authoritative. Use their IDs as SQLAlchemy-style named bound parameters whenever they constrain the request, for example `p.id = :player_id` with
-`{{ "player_id": 123 }}`. Never use PostgreSQL positional placeholders such as `$1`.
-Never resolve event names yourself or invent columns.
-"""
+    return sql_generator_system_prompt(schema_description)

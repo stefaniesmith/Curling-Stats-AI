@@ -29,6 +29,12 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(app_graph, "ChatOpenAI", fake_model)
     monkeypatch.setattr(app_graph, "create_react_agent", fake_graph)
+    catalog = (
+        "| Competition | Years covered | Shot statistics | Common aliases |\n"
+        "| --- | --- | --- | --- |\n"
+        "| Hearts | 1982–2025 | Available | Scotties; Tournament of Hearts |"
+    )
+    monkeypatch.setattr(app_graph, "competition_catalog_prompt", lambda: catalog)
 
     graph = app_graph.build_graph(
         Settings(openai_api_key=SecretStr("test-key"), openai_model="test-model")
@@ -49,7 +55,7 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
             app_graph.query_analytics,
             app_graph.create_visualization,
         ],
-        "prompt": app_graph.SYSTEM_PROMPT,
+        "prompt": app_graph.main_agent_system_prompt(catalog),
     }
     query_schema = app_graph.query_analytics.args_schema.model_json_schema()
     resolver_schema = app_graph.resolve_player.args_schema.model_json_schema()
@@ -79,10 +85,16 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert "Successful Event Resolver results only" in query_schema["properties"]["resolved_events"][
         "description"
     ]
-    assert "never generate, request, or expose SQL" in app_graph.SYSTEM_PROMPT.replace("\n", " ")
-    assert "Canada Cup (Men)" in app_graph.SYSTEM_PROMPT
-    assert "Tournament of Hearts \"Hearts\"" in app_graph.SYSTEM_PROMPT
-    assert "Scotties" in app_graph.SYSTEM_PROMPT
+    system_prompt = captured["graph"]["prompt"]  # type: ignore[index]
+    assert "Never generate, request, expose, or explain SQL" in system_prompt
+    assert "Hearts | 1982–2025 | Available" in system_prompt
+    assert "no matching imported records were found" in system_prompt
+    assert "do not ask the user whether they want one" in system_prompt
+    assert "Always create one for an explicit request to" in system_prompt
+    assert "A single winner or scalar result" in system_prompt.replace("\n", " ")
+    assert "rank multiple results" in system_prompt
+    assert "do not announce it or describe its renderer" in system_prompt
+    assert "bar chart visualization" in system_prompt
     assert set(visualization_schema["properties"]) == {"request"}
     assert visualization_schema["properties"]["request"]["description"] == (
         "One successful analytics result plus a typed table, summary, or chart specification. "
@@ -97,6 +109,7 @@ def test_build_graph_adds_a_checkpointer_when_supplied(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         app_graph, "create_react_agent", lambda **kwargs: captured.update(kwargs) or "graph"
     )
+    monkeypatch.setattr(app_graph, "competition_catalog_prompt", lambda: "Competition catalog")
 
     checkpointer = object()
     assert (

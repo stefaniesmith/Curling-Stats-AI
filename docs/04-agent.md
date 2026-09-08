@@ -22,12 +22,40 @@ artifacts created during the turn through the chat endpoint. The model is
 instructed to resolve player identities before querying statistics, and it has
 no direct database access or SQL-generation responsibility.
 
-The system prompt also supplies the small, static archive event vocabulary. It
-uses the archive’s canonical terms when calling tools while interpreting common
-names such as “Scotties” and “Tournament of Hearts” as the source event
-“Hearts.” This lets the agent answer which event families are available without
-creating a separate catalog tool; the Event Resolver still validates event
-identities used in analytics queries.
+The system prompt includes a deterministic, live-rendered competition reference
+from imported event metadata. It gives each canonical competition name, its
+earliest and latest imported years, all-shot-statistics availability, and a
+small curated alias list (including “Scotties” and “Tournament of Hearts” for
+“Hearts”). It does not expose event IDs. This lets the agent explain archive
+coverage while the Event Resolver remains the authoritative deterministic path
+for resolving a user phrase to an event identity used in analytics queries.
+
+System instructions are versioned Markdown assets in `agent/prompts` rather
+than inline Python strings. The SQL-generation prompt receives a live,
+inspected analytics schema description containing column types, nullability,
+keys, relationships, comments where supported, and check constraints. It
+explicitly treats `NULL` statistical values as unavailable source data, not
+zero, and requires null-safe ordering for nullable-metric rankings.
+For rankings, position comparisons, and performance aggregates, it also
+excludes alternate-designated stints by default while retaining historical
+records where alternate status is unmarked.
+It describes the statistics table as player stints, so event-wide and career
+queries aggregate a player's multiple positions or teams when those dimensions
+are not explicitly requested. Percentage rankings use the corresponding shot
+quantities for volume-weighted calculations rather than ranking one small stint
+or averaging row percentages. The prompt gives the SQL generator an explicit
+`SUM(metric_total * metric_percent) / SUM(metric_total)` pattern rather than
+leaving the weighted calculation implicit. Generated result aliases remain
+user-facing statistic names rather than exposing calculation details such as
+“weighted.”
+
+After successful analytical queries, the main agent creates useful
+visualizations proactively rather than asking permission in a follow-up turn.
+It uses charts for trends, rankings, and comparisons, tables when exact values
+or many categories matter, and answers a single winner or scalar result in
+prose unless the user explicitly requests a table or chart.
+When it includes an artifact, the written response states the takeaway directly
+rather than announcing or describing the chart or table renderer.
 
 Conversation persistence is implemented with LangGraph's PostgreSQL
 checkpointer. Every chat request supplies the application's UUID as the

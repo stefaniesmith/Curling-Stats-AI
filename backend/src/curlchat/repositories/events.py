@@ -21,6 +21,16 @@ class EventNameRecord:
     normalized_source_slug: str
 
 
+@dataclass(frozen=True)
+class CompetitionCatalogRecord:
+    """Imported competition metadata suitable for deterministic prompt context."""
+
+    display_name: str
+    first_event_year: int | None
+    last_event_year: int | None
+    has_shot_statistics: bool
+
+
 class EventRepository:
     """Read-only access to the small imported event catalog."""
 
@@ -37,6 +47,18 @@ class EventRepository:
                 normalized_source_slug=normalize_name(event.source_slug),
             )
             for event in self._session.scalars(select(Event).order_by(Event.id))
+        ]
+
+    def list_competition_catalog_records(self) -> list[CompetitionCatalogRecord]:
+        """Return competition coverage metadata without exposing internal event IDs."""
+        return [
+            CompetitionCatalogRecord(
+                display_name=event.display_name,
+                first_event_year=event.first_event_year,
+                last_event_year=event.last_event_year,
+                has_shot_statistics=event.has_shot_statistics,
+            )
+            for event in self._session.scalars(select(Event).order_by(Event.display_name))
         ]
 
     def event_ids_with_statistics_for_players(

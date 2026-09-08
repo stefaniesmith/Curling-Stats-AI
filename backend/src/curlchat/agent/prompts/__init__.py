@@ -1,1 +1,1 @@
-"""Prompt assets for the agent layer."""
+"""Versioned Markdown prompt assets for the agent layer."""

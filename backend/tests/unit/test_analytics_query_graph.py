@@ -204,8 +204,11 @@ def test_sql_generation_context_is_derived_from_live_database_metadata() -> None
 
     description = analytics_schema_description(engine)
 
-    assert "players: id, display_name" in description
-    assert "player_event_statistics: id, player_id, event_id, event_year" in description
+    assert "players\n- id: INTEGER; NOT NULL; PRIMARY KEY" in description
+    assert "- display_name: VARCHAR(255); NOT NULL" in description
+    assert "- player_id: INTEGER; NOT NULL; REFERENCES players.id" in description
+    assert "- shots_percent: SMALLINT; NULL" in description
+    assert "CHECK: shots_percent IS NULL OR shots_percent BETWEEN 0 AND 100" in description
 
 
 def test_sql_generation_prompt_requires_named_bind_parameters() -> None:
@@ -213,7 +216,21 @@ def test_sql_generation_prompt_requires_named_bind_parameters() -> None:
 
     assert "SQLAlchemy-style named bound parameters" in prompt
     assert "positional placeholders such as `$1`" in prompt
-    assert "display_name and player_id pair" in prompt
+    assert "authoritative `display_name`/ID pairs" in prompt
+    assert "ORDER BY metric DESC NULLS LAST" in prompt
+    assert "`NULL` means the archive does not provide that value" in prompt
+    assert "alternate IS NOT TRUE" in prompt.replace("\n", " ")
+    assert "position-specific comparisons" in prompt
+    assert "one player stint" in prompt
+    assert "combine eligible stints by player" in prompt
+    assert "volume-weighted percentage" in prompt
+    assert "unweighted average across stints" in prompt
+    assert "SUM(metric_total * metric_percent)::numeric / NULLIF(SUM(metric_total), 0)" in prompt
+    assert "SUM(draw_total * draw_percent)::numeric / NULLIF(SUM(draw_total), 0)" in prompt
+    assert "Do not divide a total by itself" in prompt.replace("\n", " ")
+    assert "`draw_percentage`, not `weighted_draw_percent`" in prompt
+    assert "must not appear in result column names" in prompt.replace("\n", " ")
+    assert "players: id" in prompt
 
 
 def test_sql_generator_uses_function_calling_structured_output(monkeypatch) -> None:
