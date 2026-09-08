@@ -358,8 +358,8 @@ Each component performs one responsibility before passing control to the next la
 
 ## Observability
 
-Optional OpenTelemetry tracing runs alongside the request lifecycle and exports
-agent and tool spans to a self-hosted Phoenix instance. Phoenix is operational
+Optional OpenTelemetry tracing records agent, model, and tool spans to a
+self-hosted Phoenix instance without tracing ordinary HTTP requests. Phoenix is operational
 infrastructure: it does not participate in business decisions and does not
 store analytics data. See `06-observability.md` for configuration and data
 handling.

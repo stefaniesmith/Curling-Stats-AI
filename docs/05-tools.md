@@ -233,6 +233,11 @@ Player Resolver and Event Resolver display-name/ID pair against the imported
 identity catalogs. A mismatch is rejected rather than querying an identity
 identified by a fabricated ID.
 
+When Player Resolver identities are supplied to the Event Resolver, its result
+also reports whether the matched event has imported records for every supplied
+player. This is availability context only; it does not alter the resolved event
+identity or apply the user's year and statistic filters.
+
 The agent-facing contract accepts an analytical request and resolved player
 identity pairs (`display_name` and `player_id`), not SQL. Keeping each name
 paired with its ID means comparison requests retain the exact identity mapping

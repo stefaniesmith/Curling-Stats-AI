@@ -12,7 +12,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(chat_router)
     app.include_router(conversations_router)
-    configure_tracing(app, get_settings())
+    configure_tracing(get_settings())
     return app
 
 

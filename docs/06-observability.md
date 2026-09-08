@@ -9,20 +9,19 @@ chat response when the collector is unavailable.
 
 ## Trace Boundaries
 
-When tracing is enabled, each non-health HTTP request is the parent span for
-the LangGraph and LangChain work it starts. Phoenix's LangChain instrumentor
-automatically records LangGraph agent invocations, model calls, and tool calls.
-This makes one chat turn visible as a hierarchy such as:
+When tracing is enabled, Phoenix's LangChain instrumentor automatically records
+LangGraph agent invocations, model calls, and tool calls. HTTP framework
+instrumentation is deliberately disabled, so routine API requests do not create
+traces. One chat turn is visible as a hierarchy such as:
 
 ```text
-POST /api/chat
-  └── CurlChat agent
-        ├── Player Resolver
-        ├── Event Resolver
-        ├── Analytics Query Tool
-        │     ├── SQL-generation graph
-        │     └── validated query execution
-        └── Visualization Tool
+CurlChat agent
+  ├── Player Resolver
+  ├── Event Resolver
+  ├── Analytics Query Tool
+  │     ├── SQL-generation graph
+  │     └── validated query execution
+  └── Visualization Tool
 ```
 
 The initial implementation deliberately does not add manual spans to every

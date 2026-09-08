@@ -42,6 +42,7 @@ class EventResolution(BaseModel):
     query: str
     status: EventResolutionStatus
     matches: tuple[ResolvedEvent, ...]
+    has_records_for_resolved_players: bool | None = None
 
     @property
     def event(self) -> ResolvedEvent | None:
@@ -74,11 +75,7 @@ class EventResolver:
 
         suggestions = self._fuzzy_matches(records, normalized_query)
         if self._is_clear_fuzzy_match(suggestions):
-            return EventResolution(
-                query=query,
-                status=EventResolutionStatus.MATCHED,
-                matches=(suggestions[0],),
-            )
+            return self._resolution_for(query, (suggestions[0],), resolved_players)
         return EventResolution(
             query=query,
             status=(EventResolutionStatus.AMBIGUOUS if suggestions else EventResolutionStatus.NOT_FOUND),
@@ -148,14 +145,24 @@ class EventResolver:
         resolved_players: tuple[ResolvedPlayerIdentity, ...],
     ) -> EventResolution:
         narrowed_matches = self._narrow_by_player_statistics(matches, resolved_players)
+        status = (
+            EventResolutionStatus.MATCHED
+            if len(narrowed_matches) == 1
+            else EventResolutionStatus.AMBIGUOUS
+        )
+        has_records = None
+        if status is EventResolutionStatus.MATCHED and resolved_players:
+            has_records = bool(
+                self._repository.event_ids_with_statistics_for_players(
+                    (narrowed_matches[0].event_id,),
+                    tuple(player.player_id for player in resolved_players),
+                )
+            )
         return EventResolution(
             query=query,
-            status=(
-                EventResolutionStatus.MATCHED
-                if len(narrowed_matches) == 1
-                else EventResolutionStatus.AMBIGUOUS
-            ),
+            status=status,
             matches=narrowed_matches,
+            has_records_for_resolved_players=has_records,
         )
 
     def _narrow_by_player_statistics(
