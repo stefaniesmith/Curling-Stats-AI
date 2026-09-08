@@ -56,11 +56,12 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
             app_graph.create_visualization,
         ],
         "prompt": app_graph.main_agent_system_prompt(catalog),
+        "state_schema": app_graph.CurlChatAgentState,
     }
-    query_schema = app_graph.query_analytics.args_schema.model_json_schema()
+    query_schema = app_graph.query_analytics.tool_call_schema.model_json_schema()
     resolver_schema = app_graph.resolve_player.args_schema.model_json_schema()
     event_resolver_schema = app_graph.resolve_event.args_schema.model_json_schema()
-    visualization_schema = app_graph.create_visualization.args_schema.model_json_schema()
+    visualization_schema = app_graph.create_visualization.tool_call_schema.model_json_schema()
     assert "sql" not in query_schema["properties"]
     assert set(query_schema["properties"]) == {"request", "resolved_players", "resolved_events"}
     assert "display_name" in str(query_schema)
@@ -95,10 +96,10 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert "rank multiple results" in system_prompt
     assert "do not announce it or describe its renderer" in system_prompt
     assert "bar chart visualization" in system_prompt
-    assert set(visualization_schema["properties"]) == {"request"}
-    assert visualization_schema["properties"]["request"]["description"] == (
-        "One successful analytics result plus a typed table, summary, or chart specification. "
-        "Pass result rows unchanged."
+    assert set(visualization_schema["properties"]) == {"spec"}
+    assert visualization_schema["properties"]["spec"]["description"] == (
+        "A typed table, summary, or chart specification for the latest successful analytics "
+        "result. Select columns and mappings only; do not pass or reproduce result rows."
     )
 
 
@@ -262,24 +263,52 @@ def test_stream_response_emits_text_deltas_and_complete_artifacts(monkeypatch: p
     class FakeGraph:
         def stream(self, state: dict[str, object], **kwargs: object):
             assert state == {"messages": [{"role": "user", "content": "Compare wins"}]}
-            assert kwargs["stream_mode"] == ["messages", "updates"]
+            assert kwargs["stream_mode"] == "updates"
             return iter(
                 [
-                    ("messages", (SimpleNamespace(content="Here "), {"langgraph_node": "agent"})),
-                    ("messages", (SimpleNamespace(content="are the results."), {"langgraph_node": "agent"})),
-                    (
-                        "updates",
-                        {
-                            "tools": {
-                                "messages": [
-                                    SimpleNamespace(
-                                        name="create_visualization",
-                                        content='{"type":"table","payload":{"rows":[]}}',
-                                    )
-                                ]
-                            }
-                        },
-                    ),
+                    {
+                        "agent": {
+                            "messages": [
+                                SimpleNamespace(
+                                    type="ai",
+                                    content="I will query the statistics.",
+                                    tool_calls=[{"name": "query_analytics"}],
+                                )
+                            ]
+                        }
+                    },
+                    {
+                        "agent": {
+                            "messages": [
+                                SimpleNamespace(
+                                    type="ai",
+                                    content="I will prepare a table.",
+                                    tool_calls=[{"name": "create_visualization"}],
+                                )
+                            ]
+                        }
+                    },
+                    {
+                        "tools": {
+                            "messages": [
+                                SimpleNamespace(
+                                    name="create_visualization",
+                                    content='{"type":"table","payload":{"rows":[]}}',
+                                )
+                            ]
+                        }
+                    },
+                    {
+                        "agent": {
+                            "messages": [
+                                SimpleNamespace(
+                                    type="ai",
+                                    content="Here are the results.",
+                                    tool_calls=[],
+                                )
+                            ]
+                        }
+                    },
                 ]
             )
 
@@ -297,11 +326,15 @@ def test_stream_response_emits_text_deltas_and_complete_artifacts(monkeypatch: p
     )
 
     assert [(event.type, event.payload) for event in events] == [
-        ("markdown_delta", {"delta": "Here "}),
-        ("markdown_delta", {"delta": "are the results."}),
+        ("status", {"label": "Resolving context…"}),
+        ("status", {"label": "Querying statistics…"}),
+        ("status", {"label": "Preparing visualization…"}),
         ("artifact", {"type": "table", "payload": {"rows": []}}),
+        ("status", {"label": "Writing answer…"}),
+        ("markdown_delta", {"delta": "Here are the results."}),
         ("complete", {}),
     ]
+    assert all("I will" not in str(event.payload) for event in events)
 
 
 def test_message_text_extracts_responses_content_blocks() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import StrEnum
 from numbers import Real
 from typing import Annotated, Any, Literal
@@ -143,18 +144,24 @@ class VisualizationService:
 
     def create(self, request: VisualizationRequest) -> VisualizationArtifact:
         """Create exactly one artifact or reject an incompatible specification."""
-        if isinstance(request.spec, TableVisualizationSpec):
+        return self.create_from_result(request.result, request.spec)
+
+    def create_from_result(
+        self, result: AnalyticsResultData, spec: VisualizationSpec
+    ) -> VisualizationArtifact:
+        """Create exactly one artifact from a trusted result and typed specification."""
+        if isinstance(spec, TableVisualizationSpec):
             return VisualizationArtifact(
                 type=VisualizationType.TABLE,
                 payload={
-                    "columns": request.result.columns,
-                    "rows": request.result.rows,
-                    "title": request.spec.title,
+                    "columns": result.columns,
+                    "rows": result.rows,
+                    "title": spec.title,
                 },
             )
-        if isinstance(request.spec, ChartVisualizationSpec):
-            return self._chart(request.result, request.spec)
-        return self._summary(request.result, request.spec)
+        if isinstance(spec, ChartVisualizationSpec):
+            return self._chart(result, spec)
+        return self._summary(result, spec)
 
     def _chart(
         self, result: AnalyticsResultData, spec: ChartVisualizationSpec
@@ -259,28 +266,30 @@ class VisualizationService:
             },
         )
 
-    @staticmethod
+    @classmethod
     def _long_points(
+        cls,
         result: AnalyticsResultData, mapping: LongChartDataMapping
     ) -> tuple[dict[str, Any], ...]:
         return tuple(
             {
                 "x": row[mapping.x_column],
-                "y": row[mapping.y_column],
+                "y": cls._json_number(row[mapping.y_column]),
                 **({"series": row[mapping.series_column]} if mapping.series_column else {}),
             }
             for row in result.rows
             if row.get(mapping.x_column) is not None and row.get(mapping.y_column) is not None
         )
 
-    @staticmethod
+    @classmethod
     def _wide_points(
+        cls,
         result: AnalyticsResultData, mapping: WideChartDataMapping
     ) -> tuple[dict[str, Any], ...]:
         return tuple(
             {
-                "x": VisualizationService._display_label(column),
-                "y": row[column],
+                "x": cls._display_label(column),
+                "y": cls._json_number(row[column]),
                 **({"series": row[mapping.series_column]} if mapping.series_column else {}),
             }
             for row in result.rows
@@ -306,7 +315,12 @@ class VisualizationService:
 
     @staticmethod
     def _is_number(value: object) -> bool:
-        return isinstance(value, Real) and not isinstance(value, bool)
+        return isinstance(value, (Real, Decimal)) and not isinstance(value, bool)
+
+    @staticmethod
+    def _json_number(value: object) -> object:
+        """Convert database Decimal values into JSON number values for chart payloads."""
+        return float(value) if isinstance(value, Decimal) else value
 
     @staticmethod
     def _display_label(column: str) -> str:

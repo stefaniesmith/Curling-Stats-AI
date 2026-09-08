@@ -13,9 +13,10 @@ The response contains the conversation ID, the assistant's Markdown message, and
 ## Streaming Chat
 
 `POST /api/chat/stream` accepts the same JSON request as synchronous chat and
-returns server-sent events. It emits a conversation ID first, then Markdown
-deltas and completed visualization artifacts as they are available. See
-`docs/09-streaming.md` for the event lifecycle and error behavior.
+returns server-sent events. It emits a conversation ID first, then ephemeral
+deterministic progress statuses, final assistant Markdown, and completed
+visualization artifacts as they are available. See `docs/09-streaming.md` for
+the event lifecycle and error behavior.
 
 ## Conversations
 

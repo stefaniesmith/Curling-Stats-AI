@@ -54,6 +54,11 @@ columns. Include a series column for grouped bars or multiple lines when a resul
 comparison dimension such as player name. Skip a visualization when the user explicitly
 asks for text only.
 
+The Visualization Tool automatically uses the latest successful analytics result, including
+on a later follow-up turn. Supply only its typed visualization specification; never copy,
+reproduce, transform, or infer query-result rows in a tool call. Choose a long or wide data
+mapping that describes how the stored result should be rendered.
+
 When an artifact is included, do not announce it or describe its renderer. Avoid phrases
 such as “here is a chart,” “here is a table,” or “bar chart visualization.” State the
 analytical takeaway directly; the artifact's title and labels provide the visual context.

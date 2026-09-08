@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from langchain_core.tools import tool
+from langgraph.prebuilt import InjectedState
 from pydantic import BaseModel, Field
 
 from curlchat.services.visualization_service import (
-    VisualizationRequest,
+    AnalyticsResultData,
     VisualizationRequestError,
     VisualizationService,
+    VisualizationSpec,
 )
 
 
@@ -20,21 +22,35 @@ class VisualizationToolError(BaseModel):
     error: str
 
 
-@tool
-def create_visualization(
-    request: Annotated[
-        VisualizationRequest,
-        Field(
-            description=(
-                "One successful analytics result plus a typed table, summary, or chart specification. "
-                "Pass result rows unchanged."
-            )
-        ),
-    ],
+def create_visualization_from_result(
+    result: AnalyticsResultData | None, spec: VisualizationSpec
 ) -> str:
-    """Create one frontend artifact from a successful analytics result; never query the database."""
+    """Create an artifact from the last successful typed analytics result."""
+    if result is None:
+        return VisualizationToolError(
+            error="No successful analytics result is available to visualize."
+        ).model_dump_json()
     try:
-        artifact = VisualizationService().create(request)
+        artifact = VisualizationService().create_from_result(result, spec)
     except VisualizationRequestError as error:
         return VisualizationToolError(error=str(error)).model_dump_json()
     return artifact.model_dump_json()
+
+
+@tool
+def create_visualization(
+    spec: Annotated[
+        VisualizationSpec,
+        Field(
+            description=(
+                "A typed table, summary, or chart specification for the latest successful analytics "
+                "result. Select columns and mappings only; do not pass or reproduce result rows."
+            )
+        ),
+    ],
+    state: Annotated[dict[str, Any], InjectedState],
+) -> str:
+    """Create one frontend artifact from a successful analytics result; never query the database."""
+    latest_result = state.get("latest_analytics_result")
+    result = AnalyticsResultData.model_validate(latest_result) if latest_result is not None else None
+    return create_visualization_from_result(result, spec)

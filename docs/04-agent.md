@@ -17,8 +17,8 @@ persisted conversations, and streaming execution.
 
 The first implemented graph uses a configurable OpenAI chat model and exposes
 four tools: Player Resolver, Event Resolver, Analytics Query, and
-Visualization. It is stateless and returns Markdown plus any visualization
-artifacts created during the turn through the chat endpoint. The model is
+Visualization. It returns Markdown plus any visualization artifacts created
+during the turn through the chat endpoint. The model is
 instructed to resolve player identities before querying statistics, and it has
 no direct database access or SQL-generation responsibility.
 
@@ -63,6 +63,15 @@ checkpointer `thread_id`, so successful turns become available to follow-up
 requests in that conversation. The graph streams final assistant Markdown token
 deltas and completed Visualization Tool outputs; the API translates those
 internal events into a frontend-safe SSE contract.
+
+The graph also retains the latest successful analytics result in its persisted
+state. The Analytics Query Tool returns a readable serialized result to the
+model and stores the original typed rows in that state. The Visualization Tool
+receives only a typed table, summary, or chart specification and reads those
+rows internally. This prevents the model from having to copy result values into
+a second tool call, preserves database numeric types such as `Decimal`, and
+allows a later request such as “visualize that” to use the previous result. A
+failed query does not replace the retained successful result.
 
 ---
 
@@ -214,7 +223,8 @@ player has records for that candidate.
 
 ### Visualization Tool
 
-Transforms query results into frontend-friendly visualization artifacts.
+Transforms the latest successful query result into frontend-friendly
+visualization artifacts.
 
 Examples include:
 

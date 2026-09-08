@@ -1,8 +1,9 @@
 import json
+from decimal import Decimal
 
 import pytest
 
-from curlchat.agent.tools.visualization import create_visualization
+from curlchat.agent.tools.visualization import create_visualization_from_result
 from curlchat.services.visualization_service import (
     AnalyticsResultData,
     ChartType,
@@ -211,17 +212,13 @@ def test_requires_a_series_column_for_multiple_wide_rows() -> None:
         VisualizationService().create(request)
 
 
-def test_tool_returns_a_json_artifact() -> None:
-    result = create_visualization.invoke(
-        {
-            "request": {
-                "result": {
-                    "columns": ["display_name", "wins"],
-                    "rows": [{"display_name": "Brad Jacobs", "wins": 6}],
-                },
-                "spec": {"type": "table"},
-            }
-        }
+def test_tool_creates_an_artifact_from_a_typed_result() -> None:
+    result = create_visualization_from_result(
+        AnalyticsResultData(
+            columns=("display_name", "wins"),
+            rows=({"display_name": "Brad Jacobs", "wins": 6},),
+        ),
+        TableVisualizationSpec(type="table"),
     )
 
     assert json.loads(result) == {
@@ -232,3 +229,24 @@ def test_tool_returns_a_json_artifact() -> None:
             "title": None,
         },
     }
+
+
+def test_chart_converts_database_decimals_to_json_numbers() -> None:
+    artifact = VisualizationService().create(
+        VisualizationRequest(
+            result=AnalyticsResultData(
+                columns=("display_name", "draw_percentage"),
+                rows=({"display_name": "Ben Hebert", "draw_percentage": Decimal("95.0")},),
+            ),
+            spec=ChartVisualizationSpec(
+                type="chart",
+                chart_type=ChartType.BAR,
+                data_mapping=LongChartDataMapping(
+                    format="long", x_column="display_name", y_column="draw_percentage"
+                ),
+            ),
+        )
+    )
+
+    assert artifact.payload["points"] == ({"x": "Ben Hebert", "y": 95.0},)
+    assert json.loads(artifact.model_dump_json())["payload"]["points"][0]["y"] == 95.0

@@ -26,6 +26,7 @@ export function App() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+  const [activity, setActivity] = useState<string>();
   const [error, setError] = useState<string>();
   const messagesContainer = useRef<HTMLDivElement>(null);
 
@@ -53,6 +54,7 @@ export function App() {
     setMessages([]);
     setDraft("");
     setError(undefined);
+    setActivity(undefined);
     setIsLoadingHistory(false);
   };
 
@@ -60,6 +62,7 @@ export function App() {
     setActiveConversationId(id);
     setMessages([]);
     setError(undefined);
+    setActivity(undefined);
     setIsLoadingHistory(true);
     try {
       const history = await getConversationMessages(id);
@@ -83,6 +86,7 @@ export function App() {
     if (!trimmed || isSending) return;
     setDraft("");
     setError(undefined);
+    setActivity("Resolving context…");
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: trimmed }]);
     setIsSending(true);
     const assistantMessageId = crypto.randomUUID();
@@ -101,6 +105,8 @@ export function App() {
       await streamMessage({ message: trimmed, conversation_id: activeConversationId }, (event) => {
         if (event.type === "message_start") {
           setActiveConversationId(event.payload.conversation_id);
+        } else if (event.type === "status") {
+          setActivity(event.payload.label);
         } else if (event.type === "markdown_delta") {
           setMessages((current) => {
             const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
@@ -138,6 +144,7 @@ export function App() {
       setError(apiError.status === 404 ? "This conversation is no longer available. Start a new one to continue." : apiError.message);
     } finally {
       setIsSending(false);
+      setActivity(undefined);
     }
   };
 
@@ -173,7 +180,7 @@ export function App() {
             {message.content && <p>{message.content}</p>}
             {message.blocks && <ResponseBlocks blocks={message.blocks} />}
           </article>)}
-          {isSending && <article className="message assistant thinking"><div className="message-label">CurlChat</div><span></span><span></span><span></span></article>}
+          {isSending && <article className="message assistant thinking"><div className="message-label">CurlChat</div><p className="thinking-status" aria-live="polite">{activity ?? "Working…"}</p><span></span><span></span><span></span></article>}
           {error && <div className="error-banner"><strong>Unable to complete the request.</strong> {error}</div>}
         </div>
         <form className="composer" onSubmit={submit}>

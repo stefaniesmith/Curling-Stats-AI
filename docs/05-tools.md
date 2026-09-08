@@ -260,9 +260,14 @@ The tool does not render charts itself.
 
 ### Inputs
 
-* one successful structured query result, preserved unchanged
 * a Pydantic-discriminated visualization specification with a `type` of
   `table`, `summary`, or `chart`
+
+The successful query result is injected from the LangGraph conversation state,
+not supplied by the agent. The query tool records the original typed result as
+the latest successful result while returning a readable serialized copy to the
+model. This keeps the visualization call small, prevents copied values from
+changing type, and lets a follow-up request reuse the prior result.
 
 ---
 
@@ -292,8 +297,8 @@ which supported renderer suits the result. The service validates its selected
 fields and builds only the frontend-ready payload. Invalid requests return a
 structured tool error rather than silently changing the visualization.
 
-The input is one typed request with separate `result` and `spec` objects. The
-specification is a discriminated union: the table variant exposes only a title;
+The agent-facing input is one typed `spec` object. The specification is a
+discriminated union: the table variant exposes only a title;
 the summary variant requires a value column and aggregation; and the chart
 variant requires its renderer plus a typed `long` or `wide` data mapping. This
 keeps unrelated fields out of each tool call shape.
@@ -309,7 +314,7 @@ Each tool exposes a stable contract to the LangGraph agent.
 | Player Resolver      | Player names       | Canonical player identities  |
 | Event Resolver       | Event names        | Canonical event identities   |
 | Analytics Query Tool | Analytical request | Structured query results     |
-| Visualization Tool   | Query results      | Visualization artifacts      |
+| Visualization Tool   | Visualization spec | Visualization artifacts      |
 
 The agent interacts only with these contracts.
 

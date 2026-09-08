@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import nullcontext
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, TypedDict
 from uuid import UUID
 
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.graph.message import add_messages
+from langgraph.managed import RemainingSteps
 from langgraph.prebuilt import create_react_agent
 from openai import OpenAIError
 from pydantic import BaseModel, Field, ValidationError
@@ -33,6 +35,21 @@ class AgentInvocationError(RuntimeError):
     """The configured model provider could not complete an agent request."""
 
 
+class LatestAnalyticsResult(TypedDict):
+    """The serializable, typed data retained after a successful analytics query."""
+
+    columns: tuple[str, ...]
+    rows: tuple[dict[str, Any], ...]
+
+
+class CurlChatAgentState(TypedDict):
+    """Persisted conversation and the last successful typed analytics result."""
+
+    messages: Annotated[list[Any], add_messages]
+    remaining_steps: RemainingSteps
+    latest_analytics_result: LatestAnalyticsResult | None
+
+
 class AgentResponse(BaseModel):
     """Final text and renderable artifacts from one agent invocation."""
 
@@ -43,7 +60,7 @@ class AgentResponse(BaseModel):
 class AgentStreamEvent(BaseModel):
     """One renderable event emitted while a graph turn is in progress."""
 
-    type: Literal["markdown_delta", "artifact", "complete"]
+    type: Literal["status", "markdown_delta", "artifact", "complete"]
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -79,6 +96,7 @@ def build_graph(
         "model": model,
         "tools": [resolve_player, resolve_event, query_analytics, create_visualization],
         "prompt": system_prompt,
+        "state_schema": CurlChatAgentState,
     }
     if checkpointer is not None:
         graph_arguments["checkpointer"] = checkpointer
@@ -124,7 +142,7 @@ def respond_to_message(
 def stream_response(
     message: str, conversation_id: UUID, settings: Settings | None = None
 ) -> Iterator[AgentStreamEvent]:
-    """Stream final Markdown tokens and complete visualization artifacts for one turn."""
+    """Stream deterministic progress, final prose, and completed visualization artifacts."""
     configured_settings = settings or get_settings()
     try:
         with PostgresSaver.from_conn_string(
@@ -132,25 +150,28 @@ def stream_response(
         ) as checkpointer:
             graph = build_graph(configured_settings, checkpointer=checkpointer)
             config = {"configurable": {"thread_id": str(conversation_id)}}
-            for mode, data in graph.stream(
+            yield AgentStreamEvent(type="status", payload={"label": "Resolving context…"})
+            latest_status = "Resolving context…"
+            for data in graph.stream(
                 {"messages": [{"role": "user", "content": message}]},
                 config=config,
-                stream_mode=["messages", "updates"],
+                stream_mode="updates",
                 durability="sync",
             ):
-                if mode == "messages":
-                    chunk, metadata = data
-                    if metadata.get("langgraph_node") != "agent":
-                        continue
-                    text = _message_text(_content(chunk))
-                    if text:
-                        yield AgentStreamEvent(type="markdown_delta", payload={"delta": text})
-                elif mode == "updates":
-                    for artifact in _artifacts_from_updates(data):
-                        yield AgentStreamEvent(
-                            type="artifact",
-                            payload={"type": artifact.type, "payload": artifact.payload},
-                        )
+                status = _status_from_updates(data)
+                if status and status != latest_status:
+                    latest_status = status
+                    yield AgentStreamEvent(type="status", payload={"label": status})
+                for artifact in _artifacts_from_updates(data):
+                    yield AgentStreamEvent(
+                        type="artifact",
+                        payload={"type": artifact.type, "payload": artifact.payload},
+                    )
+                for text in _final_response_texts_from_updates(data):
+                    if latest_status != "Writing answer…":
+                        latest_status = "Writing answer…"
+                        yield AgentStreamEvent(type="status", payload={"label": latest_status})
+                    yield AgentStreamEvent(type="markdown_delta", payload={"delta": text})
     except OpenAIError as error:
         raise AgentInvocationError("The model provider could not complete the request.") from error
     yield AgentStreamEvent(type="complete")
@@ -203,6 +224,50 @@ def _artifacts_from_updates(update: Any) -> tuple[VisualizationArtifact, ...]:
         if isinstance(messages, list):
             artifacts.extend(_visualization_artifacts(messages))
     return tuple(artifacts)
+
+
+def _status_from_updates(update: Any) -> str | None:
+    """Map deterministic tool completions to concise, non-persisted UI progress text."""
+    tool_names: set[str | None] = set()
+    for node_update in _node_updates(update):
+        messages = node_update.get("messages", [])
+        if isinstance(messages, list):
+            for message in messages:
+                tool_names.add(getattr(message, "name", None))
+                tool_names.update(
+                    call.get("name")
+                    for call in (_tool_calls(message) or [])
+                    if isinstance(call, dict)
+                )
+    if create_visualization.name in tool_names:
+        return "Preparing visualization…"
+    if query_analytics.name in tool_names:
+        return "Querying statistics…"
+    if resolve_player.name in tool_names or resolve_event.name in tool_names:
+        return "Resolving context…"
+    return None
+
+
+def _final_response_texts_from_updates(update: Any) -> tuple[str, ...]:
+    """Return only completed assistant messages that do not request another tool."""
+    texts: list[str] = []
+    for node_update in _node_updates(update):
+        messages = node_update.get("messages", [])
+        if not isinstance(messages, list):
+            continue
+        for message in messages:
+            if _message_type(message) != "ai" or _tool_calls(message):
+                continue
+            if text := _message_text(_content(message)):
+                texts.append(text)
+    return tuple(texts)
+
+
+def _node_updates(update: Any) -> tuple[dict[str, Any], ...]:
+    """Return graph node update payloads in their emitted order."""
+    if not isinstance(update, dict):
+        return ()
+    return tuple(node_update for node_update in update.values() if isinstance(node_update, dict))
 
 
 def _current_turn_messages(messages: list[Any]) -> list[Any]:

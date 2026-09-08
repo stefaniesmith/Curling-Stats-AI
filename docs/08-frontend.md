@@ -16,8 +16,10 @@ The frontend owns presentation and browser-local interaction state only:
 
 It does not implement player resolution, query logic, or visualization construction.
 
-During an active turn, Markdown deltas update one in-progress assistant
-message. Completed table, summary, and chart artifacts append atomically to
+During an active turn, deterministic streaming status events update an
+ephemeral progress indicator. Markdown from a completed final assistant pass
+updates one in-progress assistant message; internal tool-planning text is never
+rendered. Completed table, summary, and chart artifacts append atomically to
 that message. The synchronous endpoint remains available in the API client for
 non-streaming callers.
 
