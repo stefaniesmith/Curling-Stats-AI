@@ -13,8 +13,8 @@ interface Message {
 }
 
 const prompts = [
-  "Show Brad Jacobs' Brier stats.",
-  "Compare Rachel Homan and Jennifer Jones from 2018 to 2024.",
+  "Show Brad Jacobs' stats at the 2026 Brier.",
+  "Compare Rachel Homan and Jennifer Jones from 2018-2024.",
   "Who had the highest draw percentage at the 2023 Hearts?",
 ];
 
@@ -86,10 +86,11 @@ export function App() {
     if (!trimmed || isSending) return;
     setDraft("");
     setError(undefined);
-    setActivity("Resolving context…");
+    setActivity("Resolving context");
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: trimmed }]);
     setIsSending(true);
     const assistantMessageId = crypto.randomUUID();
+    const pendingArtifacts: ResponseBlock[] = [];
     const appendAssistantBlock = (block: ResponseBlock) => {
       setMessages((current) => {
         const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
@@ -135,7 +136,9 @@ export function App() {
             });
           });
         } else if (event.type === "artifact") {
-          appendAssistantBlock({ type: event.payload.type, payload: event.payload.payload });
+          pendingArtifacts.push({ type: event.payload.type, payload: event.payload.payload });
+        } else if (event.type === "complete") {
+          pendingArtifacts.forEach(appendAssistantBlock);
         }
       });
       await refreshConversations();
@@ -177,10 +180,12 @@ export function App() {
           {isWelcome && !isLoadingHistory && <Welcome onPrompt={(prompt) => void submit(undefined, prompt)} />}
           {messages.map((message) => <article className={`message ${message.role}`} key={message.id}>
             <div className="message-label">{message.role === "assistant" ? "CurlChat" : "You"}</div>
-            {message.content && <p>{message.content}</p>}
-            {message.blocks && <ResponseBlocks blocks={message.blocks} />}
+            {(message.content || message.blocks) && <div className="message-card">
+              {message.content && <p>{message.content}</p>}
+              {message.blocks && <ResponseBlocks blocks={message.blocks} />}
+            </div>}
           </article>)}
-          {isSending && <article className="message assistant thinking"><div className="message-label">CurlChat</div><p className="thinking-status" aria-live="polite">{activity ?? "Working…"}</p><span></span><span></span><span></span></article>}
+          {isSending && <article className="message assistant thinking"><div className="message-label">CurlChat</div><div className="message-card"><p className="thinking-status" aria-live="polite">{activity ?? "Working…"}</p><span></span><span></span><span></span></div></article>}
           {error && <div className="error-banner"><strong>Unable to complete the request.</strong> {error}</div>}
         </div>
         <form className="composer" onSubmit={submit}>

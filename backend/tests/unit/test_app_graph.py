@@ -326,11 +326,11 @@ def test_stream_response_emits_text_deltas_and_complete_artifacts(monkeypatch: p
     )
 
     assert [(event.type, event.payload) for event in events] == [
-        ("status", {"label": "Resolving context…"}),
-        ("status", {"label": "Querying statistics…"}),
-        ("status", {"label": "Preparing visualization…"}),
+        ("status", {"label": "Resolving context"}),
+        ("status", {"label": "Querying statistics"}),
+        ("status", {"label": "Preparing visualization"}),
         ("artifact", {"type": "table", "payload": {"rows": []}}),
-        ("status", {"label": "Writing answer…"}),
+        ("status", {"label": "Writing answer"}),
         ("markdown_delta", {"delta": "Here are the results."}),
         ("complete", {}),
     ]

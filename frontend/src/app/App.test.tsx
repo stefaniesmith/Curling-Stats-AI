@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 
@@ -20,6 +20,8 @@ beforeEach(() => {
   vi.stubGlobal("crypto", { randomUUID: vi.fn(() => `message-${messageNumber++}`) });
   Element.prototype.scrollTo = vi.fn();
 });
+
+afterEach(cleanup);
 
 describe("App", () => {
   it("creates a conversation on the first message and includes its ID on a follow-up", async () => {
@@ -59,6 +61,31 @@ describe("App", () => {
       { message: "Show Brier results" },
       { message: "Only after 2020", conversation_id: "conversation-id" },
     ]);
+  });
+
+  it("adds a completed artifact after streamed markdown even when it arrives first", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      if (String(input) === "/api/conversations") return jsonResponse([]);
+      if (String(input) === "/api/chat/stream") {
+        return streamResponse([
+          { type: "message_start", payload: { conversation_id: "conversation-id" } },
+          { type: "artifact", payload: { type: "table", payload: { columns: ["wins"], rows: [{ wins: 8 }] } } },
+          { type: "markdown_delta", payload: { delta: "The answer is 8 wins." } },
+          { type: "complete", payload: {} },
+        ]);
+      }
+      return jsonResponse([]);
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByPlaceholderText(/ask about a player/i), "Show Brier results");
+    await user.keyboard("{Enter}");
+    await screen.findByRole("columnheader", { name: "wins" });
+
+    const assistant = screen.getByText("The answer is 8 wins.").closest("article");
+    expect(assistant?.textContent).toMatch(/The answer is 8 wins\.[\s\S]*wins/);
   });
 
   it("hydrates persisted messages when a sidebar conversation is selected", async () => {

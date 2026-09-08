@@ -150,8 +150,8 @@ def stream_response(
         ) as checkpointer:
             graph = build_graph(configured_settings, checkpointer=checkpointer)
             config = {"configurable": {"thread_id": str(conversation_id)}}
-            yield AgentStreamEvent(type="status", payload={"label": "Resolving context…"})
-            latest_status = "Resolving context…"
+            yield AgentStreamEvent(type="status", payload={"label": "Resolving context"})
+            latest_status = "Resolving context"
             for data in graph.stream(
                 {"messages": [{"role": "user", "content": message}]},
                 config=config,
@@ -168,8 +168,8 @@ def stream_response(
                         payload={"type": artifact.type, "payload": artifact.payload},
                     )
                 for text in _final_response_texts_from_updates(data):
-                    if latest_status != "Writing answer…":
-                        latest_status = "Writing answer…"
+                    if latest_status != "Writing answer":
+                        latest_status = "Writing answer"
                         yield AgentStreamEvent(type="status", payload={"label": latest_status})
                     yield AgentStreamEvent(type="markdown_delta", payload={"delta": text})
     except OpenAIError as error:
@@ -240,11 +240,11 @@ def _status_from_updates(update: Any) -> str | None:
                     if isinstance(call, dict)
                 )
     if create_visualization.name in tool_names:
-        return "Preparing visualization…"
+        return "Preparing visualization"
     if query_analytics.name in tool_names:
-        return "Querying statistics…"
+        return "Querying statistics"
     if resolve_player.name in tool_names or resolve_event.name in tool_names:
-        return "Resolving context…"
+        return "Resolving context"
     return None
 
 

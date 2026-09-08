@@ -16,7 +16,7 @@ The endpoint returns `text/event-stream`. Every event has one JSON `data`
 payload and arrives in this order:
 
 1. `message_start` — `{ "conversation_id": "UUID" }`; emitted before agent work.
-2. Zero or more `status` events — `{ "label": "Querying statistics…" }`; replace
+2. Zero or more `status` events — `{ "label": "Querying statistics" }`; replace
    the ephemeral UI progress label. Statuses are never saved as conversation messages.
 3. Zero or more `markdown_delta` events — `{ "delta": "text" }`; append to the
    in-progress Markdown block.
