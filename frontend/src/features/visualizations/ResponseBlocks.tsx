@@ -45,11 +45,19 @@ function TableBlock({ payload }: { payload: Record<string, unknown> }) {
       {title && <h3>{title}</h3>}
       <div className="table-scroll">
         <table>
-          <thead><tr>{columns.map((column) => <th key={column}>{columnLabels[column]}</th>)}</tr></thead>
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th key={column}>{columnLabels[column]}</th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr key={index}>
-                {columns.map((column) => <td key={column}>{displayValue((row as Record<string, unknown>)[column])}</td>)}
+                {columns.map((column) => (
+                  <td key={column}>{displayValue((row as Record<string, unknown>)[column])}</td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -72,17 +80,24 @@ function SummaryBlock({ payload }: { payload: Record<string, unknown> }) {
 }
 
 function ChartBlock({ payload }: { payload: Record<string, unknown> }) {
-  const chartType = payload.chart_type === "line" ? "scatter" : payload.chart_type === "dot" ? "scatter" : "bar";
+  const chartType =
+    payload.chart_type === "line" ? "scatter" : payload.chart_type === "dot" ? "scatter" : "bar";
   const mode = payload.chart_type === "line" ? "lines+markers" : "markers";
   const title = typeof payload.title === "string" ? payload.title : undefined;
   const titleLines = title ? wrapChartTitle(title).split("<br>").length : 0;
-  const points = Array.isArray(payload.points) ? payload.points as Array<{ x: unknown; y: unknown }> : [];
+  const points = Array.isArray(payload.points)
+    ? (payload.points as Array<{ x: unknown; y: unknown }>)
+    : [];
   const series = Array.isArray(payload.series)
-    ? payload.series as Array<{ name: string; points: Array<{ x: unknown; y: unknown }> }>
+    ? (payload.series as Array<{ name: string; points: Array<{ x: unknown; y: unknown }> }>)
     : [];
   const hasLegend = series.length > 0;
   const datasets = series.length
-    ? series.map((item) => ({ name: item.name, x: item.points.map((point) => point.x), y: item.points.map((point) => point.y) }))
+    ? series.map((item) => ({
+        name: item.name,
+        x: item.points.map((point) => point.x),
+        y: item.points.map((point) => point.y),
+      }))
     : [{ x: points.map((point) => point.x), y: points.map((point) => point.y) }];
 
   return (
@@ -91,12 +106,12 @@ function ChartBlock({ payload }: { payload: Record<string, unknown> }) {
         data={datasets.map((dataset, index) => {
           const color = seriesColors[index % seriesColors.length];
           return {
-          ...dataset,
-          type: chartType,
-          mode: chartType === "scatter" ? mode : undefined,
-          marker: { color },
-          line: { color, width: 3 },
-          hovertemplate: "%{x}<br><b>%{y}</b><extra></extra>",
+            ...dataset,
+            type: chartType,
+            mode: chartType === "scatter" ? mode : undefined,
+            marker: { color },
+            line: { color, width: 3 },
+            hovertemplate: "%{x}<br><b>%{y}</b><extra></extra>",
           };
         })}
         layout={{
@@ -134,12 +149,21 @@ function ChartBlock({ payload }: { payload: Record<string, unknown> }) {
 }
 
 export function ResponseBlocks({ blocks }: { blocks: ResponseBlock[] }) {
-  return <>{blocks.map((block, index) => {
-    const key = `${block.type}-${index}`;
-    if (block.type === "markdown") return <div className="markdown-block" key={key}><ReactMarkdown>{String(block.payload.content ?? "")}</ReactMarkdown></div>;
-    if (block.type === "table") return <TableBlock key={key} payload={block.payload} />;
-    if (block.type === "summary") return <SummaryBlock key={key} payload={block.payload} />;
-    if (block.type === "chart") return <ChartBlock key={key} payload={block.payload} />;
-    return null;
-  })}</>;
+  return (
+    <>
+      {blocks.map((block, index) => {
+        const key = `${block.type}-${index}`;
+        if (block.type === "markdown")
+          return (
+            <div className="markdown-block" key={key}>
+              <ReactMarkdown>{String(block.payload.content ?? "")}</ReactMarkdown>
+            </div>
+          );
+        if (block.type === "table") return <TableBlock key={key} payload={block.payload} />;
+        if (block.type === "summary") return <SummaryBlock key={key} payload={block.payload} />;
+        if (block.type === "chart") return <ChartBlock key={key} payload={block.payload} />;
+        return null;
+      })}
+    </>
+  );
 }

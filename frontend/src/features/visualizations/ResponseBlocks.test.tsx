@@ -9,7 +9,10 @@ describe("ResponseBlocks", () => {
       <ResponseBlocks
         blocks={[
           { type: "markdown", payload: { content: "## Brier results" } },
-          { type: "summary", payload: { title: "Average wins", label: "Average wins", value: 6.5 } },
+          {
+            type: "summary",
+            payload: { title: "Average wins", label: "Average wins", value: 6.5 },
+          },
           {
             type: "table",
             payload: {
@@ -29,24 +32,27 @@ describe("ResponseBlocks", () => {
   });
 
   it("gives series distinct colors and reserves room for a wrapped title and legend", () => {
-    const longTitle = "A long comparison of draw percentages across multiple Curling Canada championship seasons";
+    const longTitle =
+      "A long comparison of draw percentages across multiple Curling Canada championship seasons";
     render(
       <ResponseBlocks
-        blocks={[{
-          type: "chart",
-          payload: {
-            chart_type: "line",
-            title: longTitle,
-            x_column: "event_year",
-            y_column: "draw_percentage",
-            x_label: "Event Year",
-            y_label: "Draw Percentage",
-            series: [
-              { name: "Rachel Homan", points: [{ x: 2023, y: 86 }] },
-              { name: "Jennifer Jones", points: [{ x: 2023, y: 84 }] },
-            ],
+        blocks={[
+          {
+            type: "chart",
+            payload: {
+              chart_type: "line",
+              title: longTitle,
+              x_column: "event_year",
+              y_column: "draw_percentage",
+              x_label: "Event Year",
+              y_label: "Draw Percentage",
+              series: [
+                { name: "Rachel Homan", points: [{ x: 2023, y: 86 }] },
+                { name: "Jennifer Jones", points: [{ x: 2023, y: 84 }] },
+              ],
+            },
           },
-        }]}
+        ]}
       />,
     );
 
@@ -61,22 +67,26 @@ describe("ResponseBlocks", () => {
   it("formats decimal strings from table artifacts as readable numbers", () => {
     render(
       <ResponseBlocks
-        blocks={[{
-          type: "table",
-          payload: {
-            columns: ["display_name", "inturn_percentage", "difference"],
-            column_labels: {
-              display_name: "Display Name",
-              inturn_percentage: "Inturn Percentage",
-              difference: "Difference",
+        blocks={[
+          {
+            type: "table",
+            payload: {
+              columns: ["display_name", "inturn_percentage", "difference"],
+              column_labels: {
+                display_name: "Display Name",
+                inturn_percentage: "Inturn Percentage",
+                difference: "Difference",
+              },
+              rows: [
+                {
+                  display_name: "Stephen Trickett",
+                  inturn_percentage: "71.0000000000000000",
+                  difference: "38.1250000000000000",
+                },
+              ],
             },
-            rows: [{
-              display_name: "Stephen Trickett",
-              inturn_percentage: "71.0000000000000000",
-              difference: "38.1250000000000000",
-            }],
           },
-        }]}
+        ]}
       />,
     );
 

@@ -33,5 +33,8 @@ export type ChatStreamEvent =
   | { type: "message_start"; payload: { conversation_id: string } }
   | { type: "status"; payload: { label: string } }
   | { type: "markdown_delta"; payload: { delta: string } }
-  | { type: "artifact"; payload: { type: Exclude<BlockType, "markdown">; payload: Record<string, unknown> } }
+  | {
+      type: "artifact";
+      payload: { type: Exclude<BlockType, "markdown">; payload: Record<string, unknown> };
+    }
   | { type: "complete"; payload: Record<string, never> };

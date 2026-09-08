@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 
 import logoUrl from "../../../assets/CurlChatLogo.png";
 import { ApiError, getConversationMessages, listConversations, streamMessage } from "../lib/api";
@@ -41,7 +42,9 @@ export function App() {
     }
   };
 
-  useEffect(() => { void refreshConversations(); }, []);
+  useEffect(() => {
+    void refreshConversations();
+  }, []);
   useEffect(() => {
     const transcript = messagesContainer.current;
     if (transcript) {
@@ -66,15 +69,22 @@ export function App() {
     setIsLoadingHistory(true);
     try {
       const history = await getConversationMessages(id);
-      setMessages(history.map((message) => ({
-        id: crypto.randomUUID(),
-        role: message.role,
-        content: message.role === "user" ? message.content : undefined,
-        blocks: message.role === "assistant" ? message.blocks : undefined,
-      })));
+      setMessages(
+        history.map((message) => ({
+          id: crypto.randomUUID(),
+          role: message.role,
+          content: message.role === "user" ? message.content : undefined,
+          blocks: message.role === "assistant" ? message.blocks : undefined,
+        })),
+      );
     } catch (cause) {
-      const apiError = cause instanceof ApiError ? cause : new ApiError("Could not load this conversation.");
-      setError(apiError.status === 404 ? "This conversation is no longer available. Start a new one to continue." : apiError.message);
+      const apiError =
+        cause instanceof ApiError ? cause : new ApiError("Could not load this conversation.");
+      setError(
+        apiError.status === 404
+          ? "This conversation is no longer available. Start a new one to continue."
+          : apiError.message,
+      );
     } finally {
       setIsLoadingHistory(false);
     }
@@ -87,7 +97,10 @@ export function App() {
     setDraft("");
     setError(undefined);
     setActivity("Resolving context");
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: trimmed }]);
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "user", content: trimmed },
+    ]);
     setIsSending(true);
     const assistantMessageId = crypto.randomUUID();
     const pendingArtifacts: ResponseBlock[] = [];
@@ -97,9 +110,9 @@ export function App() {
         if (assistantIndex === -1) {
           return [...current, { id: assistantMessageId, role: "assistant", blocks: [block] }];
         }
-        return current.map((item, index) => index === assistantIndex
-          ? { ...item, blocks: [...(item.blocks ?? []), block] }
-          : item);
+        return current.map((item, index) =>
+          index === assistantIndex ? { ...item, blocks: [...(item.blocks ?? []), block] } : item,
+        );
       });
     };
     try {
@@ -112,11 +125,14 @@ export function App() {
           setMessages((current) => {
             const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
             if (assistantIndex === -1) {
-              return [...current, {
-                id: assistantMessageId,
-                role: "assistant",
-                blocks: [{ type: "markdown", payload: { content: event.payload.delta } }],
-              }];
+              return [
+                ...current,
+                {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  blocks: [{ type: "markdown", payload: { content: event.payload.delta } }],
+                },
+              ];
             }
             return current.map((item, index) => {
               if (index !== assistantIndex) return item;
@@ -131,7 +147,8 @@ export function App() {
                     content: `${String(markdown.payload.content ?? "")}${event.payload.delta}`,
                   },
                 };
-              } else blocks.unshift({ type: "markdown", payload: { content: event.payload.delta } });
+              } else
+                blocks.unshift({ type: "markdown", payload: { content: event.payload.delta } });
               return { ...item, blocks };
             });
           });
@@ -143,15 +160,24 @@ export function App() {
       });
       await refreshConversations();
     } catch (cause) {
-      const apiError = cause instanceof ApiError ? cause : new ApiError("CurlChat could not answer that question.");
-      setError(apiError.status === 404 ? "This conversation is no longer available. Start a new one to continue." : apiError.message);
+      const apiError =
+        cause instanceof ApiError
+          ? cause
+          : new ApiError("CurlChat could not answer that question.");
+      setError(
+        apiError.status === 404
+          ? "This conversation is no longer available. Start a new one to continue."
+          : apiError.message,
+      );
     } finally {
       setIsSending(false);
       setActivity(undefined);
     }
   };
 
-  const activeTitle = conversations.find((conversation) => conversation.id === activeConversationId)?.title;
+  const activeTitle = conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  )?.title;
   const isWelcome = messages.length === 0;
 
   return (
@@ -161,47 +187,138 @@ export function App() {
           <img src={logoUrl} alt="CurlChat" className="sidebar-logo" />
           <span>CurlChat</span>
         </div>
-        <button className="new-chat" onClick={newConversation}><span>＋</span> New conversation</button>
-        <div className="conversation-heading"><span>Recent conversations</span><button aria-label="Refresh conversations" onClick={() => void refreshConversations()}>↻</button></div>
+        <button className="new-chat" onClick={newConversation}>
+          <span>＋</span> New conversation
+        </button>
+        <div className="conversation-heading">
+          <span>Recent conversations</span>
+          <button aria-label="Refresh conversations" onClick={() => void refreshConversations()}>
+            ↻
+          </button>
+        </div>
         <nav className="conversation-list" aria-label="Recent conversations">
-          {isLoadingConversations ? <p className="sidebar-status">Loading conversations…</p> : conversations.length ? conversations.map((conversation) => (
-            <button className={conversation.id === activeConversationId ? "conversation active" : "conversation"} key={conversation.id} onClick={() => void selectConversation(conversation.id)}>
-              <span>{conversation.title}</span><small>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(conversation.updated_at))}</small>
-            </button>
-          )) : <p className="sidebar-status">Your conversations will appear here.</p>}
+          {isLoadingConversations ? (
+            <p className="sidebar-status">Loading conversations…</p>
+          ) : conversations.length ? (
+            conversations.map((conversation) => (
+              <button
+                className={
+                  conversation.id === activeConversationId ? "conversation active" : "conversation"
+                }
+                key={conversation.id}
+                onClick={() => void selectConversation(conversation.id)}
+              >
+                <span>{conversation.title}</span>
+                <small>
+                  {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+                    new Date(conversation.updated_at),
+                  )}
+                </small>
+              </button>
+            ))
+          ) : (
+            <p className="sidebar-status">Your conversations will appear here.</p>
+          )}
         </nav>
-        <div className="sidebar-foot">Curling Canada stats archive<br />AI-assisted analysis</div>
+        <div className="sidebar-foot">
+          Curling Canada stats archive
+          <br />
+          AI-assisted analysis
+        </div>
       </aside>
 
       <section className="chat-panel">
-        <header className="chat-header"><div><p>CONVERSATIONAL ANALYTICS</p><h1>{activeTitle ?? "New conversation"}</h1></div><span className="status-dot">Archive connected</span></header>
+        <header className="chat-header">
+          <div>
+            <p>CONVERSATIONAL ANALYTICS</p>
+            <h1>{activeTitle ?? "New conversation"}</h1>
+          </div>
+          <span className="status-dot">Archive connected</span>
+        </header>
         <div className="messages" ref={messagesContainer}>
           {isLoadingHistory && <div className="history-loading">Loading conversation…</div>}
-          {isWelcome && !isLoadingHistory && <Welcome onPrompt={(prompt) => void submit(undefined, prompt)} />}
-          {messages.map((message) => <article className={`message ${message.role}`} key={message.id}>
-            <div className="message-label">{message.role === "assistant" ? "CurlChat" : "You"}</div>
-            {(message.content || message.blocks) && <div className="message-card">
-              {message.content && <p>{message.content}</p>}
-              {message.blocks && <ResponseBlocks blocks={message.blocks} />}
-            </div>}
-          </article>)}
-          {isSending && <article className="message assistant thinking"><div className="message-label">CurlChat</div><div className="message-card"><p className="thinking-status" aria-live="polite">{activity ?? "Working…"}</p><span></span><span></span><span></span></div></article>}
-          {error && <div className="error-banner"><strong>Unable to complete the request.</strong> {error}</div>}
+          {isWelcome && !isLoadingHistory && (
+            <Welcome onPrompt={(prompt) => void submit(undefined, prompt)} />
+          )}
+          {messages.map((message) => (
+            <article className={`message ${message.role}`} key={message.id}>
+              <div className="message-label">
+                {message.role === "assistant" ? "CurlChat" : "You"}
+              </div>
+              {(message.content || message.blocks) && (
+                <div className="message-card">
+                  {message.content && <p>{message.content}</p>}
+                  {message.blocks && <ResponseBlocks blocks={message.blocks} />}
+                </div>
+              )}
+            </article>
+          ))}
+          {isSending && (
+            <article className="message assistant thinking">
+              <div className="message-label">CurlChat</div>
+              <div className="message-card">
+                <p className="thinking-status" aria-live="polite">
+                  {activity ?? "Working…"}
+                </p>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </article>
+          )}
+          {error && (
+            <div className="error-banner">
+              <strong>Unable to complete the request.</strong> {error}
+            </div>
+          )}
         </div>
         <form className="composer" onSubmit={submit}>
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about a player, event, season, or statistic…" rows={1} disabled={isSending || isLoadingHistory} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
-          <button type="submit" disabled={isSending || isLoadingHistory || !draft.trim()} aria-label="Send message">↑</button>
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Ask about a player, event, season, or statistic…"
+            rows={1}
+            disabled={isSending || isLoadingHistory}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void submit();
+              }
+            }}
+          />
+          <button
+            type="submit"
+            disabled={isSending || isLoadingHistory || !draft.trim()}
+            aria-label="Send message"
+          >
+            ↑
+          </button>
         </form>
-        <p className="composer-note">CurlChat uses the Curling Canada statistics archive. Results may include historical source records.</p>
+        <p className="composer-note">
+          CurlChat uses the Curling Canada statistics archive. Results may include historical source
+          records.
+        </p>
       </section>
     </main>
   );
 }
 
 function Welcome({ onPrompt }: { onPrompt: (prompt: string) => void }) {
-  return <section className="welcome">
-    <img src={logoUrl} alt="CurlChat — Curling stats. AI insights." className="welcome-logo" />
-    <p>Explore historical player performance with natural language, interactive charts, and source-grounded statistics.</p>
-    <div className="prompt-grid">{prompts.map((prompt) => <button key={prompt} onClick={() => onPrompt(prompt)}>{prompt}<span>→</span></button>)}</div>
-  </section>;
+  return (
+    <section className="welcome">
+      <img src={logoUrl} alt="CurlChat — Curling stats. AI insights." className="welcome-logo" />
+      <p>
+        Explore historical player performance with natural language, interactive charts, and
+        source-grounded statistics.
+      </p>
+      <div className="prompt-grid">
+        {prompts.map((prompt) => (
+          <button key={prompt} onClick={() => onPrompt(prompt)}>
+            {prompt}
+            <span>→</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }

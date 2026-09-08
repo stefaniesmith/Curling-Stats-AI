@@ -4,15 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 
-const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status,
-  headers: { "Content-Type": "application/json" },
-});
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
-const streamResponse = (events: Array<{ type: string; payload: object }>) => new Response(
-  events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`).join(""),
-  { headers: { "Content-Type": "text/event-stream" } },
-);
+const streamResponse = (events: Array<{ type: string; payload: object }>) =>
+  new Response(
+    events
+      .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`)
+      .join(""),
+    { headers: { "Content-Type": "text/event-stream" } },
+  );
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
@@ -92,7 +96,10 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(await screen.findByPlaceholderText(/ask about a player/i), "Show Brier results");
+    await user.type(
+      await screen.findByPlaceholderText(/ask about a player/i),
+      "Show Brier results",
+    );
     await user.keyboard("{Enter}");
     await screen.findByRole("columnheader", { name: "Wins" });
 
@@ -105,12 +112,23 @@ describe("App", () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url === "/api/conversations") {
-        return jsonResponse([{ id: "history-id", title: "Historic Brier results", created_at: "2026-09-06T00:00:00Z", updated_at: "2026-09-06T00:00:00Z" }]);
+        return jsonResponse([
+          {
+            id: "history-id",
+            title: "Historic Brier results",
+            created_at: "2026-09-06T00:00:00Z",
+            updated_at: "2026-09-06T00:00:00Z",
+          },
+        ]);
       }
       if (url === "/api/conversations/history-id/messages") {
         return jsonResponse([
           { role: "user", content: "Show historic results", blocks: [] },
-          { role: "assistant", content: "Historic answer", blocks: [{ type: "markdown", payload: { content: "Historic answer" } }] },
+          {
+            role: "assistant",
+            content: "Historic answer",
+            blocks: [{ type: "markdown", payload: { content: "Historic answer" } }],
+          },
         ]);
       }
       return jsonResponse([]);
@@ -126,10 +144,14 @@ describe("App", () => {
   });
 
   it("shows a readable API error when the conversation list cannot load", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ detail: "The state database is unavailable." }, 503));
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ detail: "The state database is unavailable." }, 503),
+    );
     render(<App />);
 
-    await waitFor(() => expect(screen.getByText(/unable to complete the request/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/unable to complete the request/i)).toBeInTheDocument(),
+    );
     expect(screen.getByText(/state database is unavailable/i)).toBeInTheDocument();
   });
 });

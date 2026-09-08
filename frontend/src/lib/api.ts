@@ -7,7 +7,10 @@ import type {
 } from "../types/api";
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status?: number) {
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
     super(message);
     this.name = "ApiError";
   }
@@ -46,12 +49,15 @@ export async function streamMessage(
 ): Promise<void> {
   const response = await fetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Accept": "text/event-stream", "Content-Type": "application/json" },
+    headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
-    throw new ApiError(payload?.detail ?? "The API could not complete that request.", response.status);
+    throw new ApiError(
+      payload?.detail ?? "The API could not complete that request.",
+      response.status,
+    );
   }
   if (!response.body) throw new ApiError("The API returned an empty streaming response.");
 
@@ -66,14 +72,17 @@ export async function streamMessage(
     for (const rawEvent of events) {
       const event = parseStreamEvent(rawEvent);
       if (!event) continue;
-      if (event.type === "error") throw new ApiError(String(event.payload.detail ?? "The chat stream failed."));
+      if (event.type === "error")
+        throw new ApiError(String(event.payload.detail ?? "The chat stream failed."));
       onEvent(event as ChatStreamEvent);
     }
     if (done) break;
   }
 }
 
-function parseStreamEvent(rawEvent: string): { type: string; payload: Record<string, unknown> } | undefined {
+function parseStreamEvent(
+  rawEvent: string,
+): { type: string; payload: Record<string, unknown> } | undefined {
   const eventType = rawEvent.match(/^event: (.+)$/m)?.[1];
   const data = rawEvent.match(/^data: (.+)$/m)?.[1];
   if (!eventType || !data) return undefined;
