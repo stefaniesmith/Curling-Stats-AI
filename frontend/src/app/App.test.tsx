@@ -153,6 +153,18 @@ describe("App", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/conversations/history-id/messages", undefined);
   });
 
+  it("clears an unsent draft when starting a new conversation", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse([]));
+    const user = userEvent.setup();
+    render(<App />);
+
+    const composer = await screen.findByPlaceholderText(/ask about a player/i);
+    await user.type(composer, "A question for later");
+    await user.click(screen.getByRole("button", { name: /new conversation/i }));
+
+    expect(screen.getByPlaceholderText(/ask about a player/i)).toHaveValue("");
+  });
+
   it("shows a readable API error when the conversation list cannot load", async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse({ detail: "The state database is unavailable." }, 503),

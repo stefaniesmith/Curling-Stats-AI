@@ -1,1 +1,2 @@
-Frontend application shell will live here after Vite scaffolding.
+The application shell composes the conversation sidebar, chat transcript, and
+message composer. It owns no API or streaming state.

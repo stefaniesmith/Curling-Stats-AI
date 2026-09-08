@@ -14,6 +14,11 @@ The frontend owns presentation and browser-local interaction state only:
 * renders the response block contract: Markdown, tables, summaries, and Plotly charts
 * exposes loading, API-unavailable, and configuration-error feedback
 
+The application shell composes feature-level components. The chat feature's
+`useChat` hook owns conversation loading and streaming state, while the
+sidebar, transcript, welcome state, and message composer remain focused
+presentational components.
+
 It does not implement player resolution, query logic, or visualization construction.
 
 During an active turn, deterministic streaming status events update an
