@@ -1,7 +1,12 @@
 import Plot from "react-plotly.js";
 import ReactMarkdown from "react-markdown";
 
-import type { ResponseBlock } from "../../types/api";
+import type {
+  ChartBlock as ChartResponseBlock,
+  SummaryBlock as SummaryResponseBlock,
+  TableBlock as TableResponseBlock,
+  ResponseBlock,
+} from "../../types/api";
 
 const seriesColors = ["#c7192d", "#087e8b", "#315e9e", "#d97b29", "#7552a1"];
 
@@ -34,11 +39,8 @@ const displayValue = (value: unknown) => {
   return value == null ? "—" : String(value);
 };
 
-function TableBlock({ payload }: { payload: Record<string, unknown> }) {
-  const columns = Array.isArray(payload.columns) ? payload.columns.map(String) : [];
-  const columnLabels = payload.column_labels as Record<string, string>;
-  const rows = Array.isArray(payload.rows) ? payload.rows : [];
-  const title = typeof payload.title === "string" ? payload.title : null;
+function TableBlock({ payload }: TableResponseBlock) {
+  const { columns, column_labels: columnLabels, rows, title } = payload;
 
   return (
     <section className="artifact artifact-table">
@@ -56,7 +58,7 @@ function TableBlock({ payload }: { payload: Record<string, unknown> }) {
             {rows.map((row, index) => (
               <tr key={index}>
                 {columns.map((column) => (
-                  <td key={column}>{displayValue((row as Record<string, unknown>)[column])}</td>
+                  <td key={column}>{displayValue(row[column])}</td>
                 ))}
               </tr>
             ))}
@@ -67,30 +69,25 @@ function TableBlock({ payload }: { payload: Record<string, unknown> }) {
   );
 }
 
-function SummaryBlock({ payload }: { payload: Record<string, unknown> }) {
-  const title = typeof payload.title === "string" ? payload.title : null;
-  const label = typeof payload.label === "string" ? payload.label : "Summary";
+function SummaryBlock({ payload }: SummaryResponseBlock) {
+  const { title, label, value } = payload;
   return (
     <section className="artifact summary-card">
       <span>{title ?? label}</span>
-      <strong>{displayValue(payload.value)}</strong>
+      <strong>{displayValue(value)}</strong>
       {title && <small>{label}</small>}
     </section>
   );
 }
 
-function ChartBlock({ payload }: { payload: Record<string, unknown> }) {
+function ChartBlock({ payload }: ChartResponseBlock) {
   const chartType =
     payload.chart_type === "line" ? "scatter" : payload.chart_type === "dot" ? "scatter" : "bar";
   const mode = payload.chart_type === "line" ? "lines+markers" : "markers";
-  const title = typeof payload.title === "string" ? payload.title : undefined;
+  const title = payload.title ?? undefined;
   const titleLines = title ? wrapChartTitle(title).split("<br>").length : 0;
-  const points = Array.isArray(payload.points)
-    ? (payload.points as Array<{ x: unknown; y: unknown }>)
-    : [];
-  const series = Array.isArray(payload.series)
-    ? (payload.series as Array<{ name: string; points: Array<{ x: unknown; y: unknown }> }>)
-    : [];
+  const points = payload.points ?? [];
+  const series = payload.series ?? [];
   const hasLegend = series.length > 0;
   const datasets = series.length
     ? series.map((item) => ({
@@ -159,9 +156,9 @@ export function ResponseBlocks({ blocks }: { blocks: ResponseBlock[] }) {
               <ReactMarkdown>{String(block.payload.content ?? "")}</ReactMarkdown>
             </div>
           );
-        if (block.type === "table") return <TableBlock key={key} payload={block.payload} />;
-        if (block.type === "summary") return <SummaryBlock key={key} payload={block.payload} />;
-        if (block.type === "chart") return <ChartBlock key={key} payload={block.payload} />;
+        if (block.type === "table") return <TableBlock key={key} {...block} />;
+        if (block.type === "summary") return <SummaryBlock key={key} {...block} />;
+        if (block.type === "chart") return <ChartBlock key={key} {...block} />;
         return null;
       })}
     </>

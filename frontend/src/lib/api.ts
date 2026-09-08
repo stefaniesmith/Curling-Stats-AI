@@ -5,6 +5,12 @@ import type {
   Conversation,
   ConversationMessage,
 } from "../types/api";
+import {
+  parseChatResponse,
+  parseChatStreamEvent,
+  parseConversationMessages,
+  parseConversations,
+} from "../types/api";
 
 export class ApiError extends Error {
   constructor(
@@ -16,7 +22,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request(path: string, init?: RequestInit): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(path, init);
@@ -28,20 +34,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = (await response.json().catch(() => null)) as { detail?: string } | null;
     throw new ApiError(body?.detail ?? "The API could not complete that request.", response.status);
   }
-  return response.json() as Promise<T>;
+  return response.json();
 }
 
-export const listConversations = () => request<Conversation[]>("/api/conversations");
+export const listConversations = async (): Promise<Conversation[]> =>
+  parseConversations(await request("/api/conversations"));
 
-export const getConversationMessages = (conversationId: string) =>
-  request<ConversationMessage[]>(`/api/conversations/${conversationId}/messages`);
+export const getConversationMessages = async (
+  conversationId: string,
+): Promise<ConversationMessage[]> =>
+  parseConversationMessages(await request(`/api/conversations/${conversationId}/messages`));
 
-export const sendMessage = (body: ChatRequest) =>
-  request<ChatResponse>("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+export const sendMessage = async (body: ChatRequest): Promise<ChatResponse> =>
+  parseChatResponse(
+    await request("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
 
 export async function streamMessage(
   body: ChatRequest,
@@ -72,9 +83,14 @@ export async function streamMessage(
     for (const rawEvent of events) {
       const event = parseStreamEvent(rawEvent);
       if (!event) continue;
-      if (event.type === "error")
+      if (event.type === "error") {
         throw new ApiError(String(event.payload.detail ?? "The chat stream failed."));
-      onEvent(event as ChatStreamEvent);
+      }
+      try {
+        onEvent(parseChatStreamEvent(event.type, event.payload));
+      } catch {
+        throw new ApiError("The API returned an invalid streaming event.");
+      }
     }
     if (done) break;
   }

@@ -43,7 +43,12 @@ describe("App", () => {
             type: "artifact",
             payload: {
               type: "table",
-              payload: { columns: ["wins"], column_labels: { wins: "Wins" }, rows: [{ wins: 8 }] },
+              payload: {
+                columns: ["wins"],
+                column_labels: { wins: "Wins" },
+                rows: [{ wins: 8 }],
+                title: null,
+              },
             },
           },
           { type: "complete", payload: {} },
@@ -84,7 +89,12 @@ describe("App", () => {
             type: "artifact",
             payload: {
               type: "table",
-              payload: { columns: ["wins"], column_labels: { wins: "Wins" }, rows: [{ wins: 8 }] },
+              payload: {
+                columns: ["wins"],
+                column_labels: { wins: "Wins" },
+                rows: [{ wins: 8 }],
+                title: null,
+              },
             },
           },
           { type: "markdown_delta", payload: { delta: "The answer is 8 wins." } },

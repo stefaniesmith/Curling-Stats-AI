@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import logoUrl from "../../../assets/CurlChatLogo.png";
 import { ApiError, getConversationMessages, listConversations, streamMessage } from "../lib/api";
 import { ResponseBlocks } from "../features/visualizations/ResponseBlocks";
-import type { Conversation, ResponseBlock } from "../types/api";
+import type { ArtifactBlock, Conversation, ResponseBlock } from "../types/api";
 
 interface Message {
   id: string;
@@ -103,7 +103,7 @@ export function App() {
     ]);
     setIsSending(true);
     const assistantMessageId = crypto.randomUUID();
-    const pendingArtifacts: ResponseBlock[] = [];
+    const pendingArtifacts: ArtifactBlock[] = [];
     const appendAssistantBlock = (block: ResponseBlock) => {
       setMessages((current) => {
         const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
@@ -140,20 +140,19 @@ export function App() {
               const markdownIndex = blocks.findIndex((block) => block.type === "markdown");
               if (markdownIndex >= 0) {
                 const markdown = blocks[markdownIndex];
-                blocks[markdownIndex] = {
-                  ...markdown,
-                  payload: {
-                    ...markdown.payload,
-                    content: `${String(markdown.payload.content ?? "")}${event.payload.delta}`,
-                  },
-                };
+                if (markdown?.type === "markdown") {
+                  blocks[markdownIndex] = {
+                    type: "markdown",
+                    payload: { content: `${markdown.payload.content}${event.payload.delta}` },
+                  };
+                }
               } else
                 blocks.unshift({ type: "markdown", payload: { content: event.payload.delta } });
               return { ...item, blocks };
             });
           });
         } else if (event.type === "artifact") {
-          pendingArtifacts.push({ type: event.payload.type, payload: event.payload.payload });
+          pendingArtifacts.push(event.payload);
         } else if (event.type === "complete") {
           pendingArtifacts.forEach(appendAssistantBlock);
         }

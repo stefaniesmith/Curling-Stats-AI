@@ -11,7 +11,13 @@ describe("ResponseBlocks", () => {
           { type: "markdown", payload: { content: "## Brier results" } },
           {
             type: "summary",
-            payload: { title: "Average wins", label: "Average wins", value: 6.5 },
+            payload: {
+              title: "Average wins",
+              label: "Average wins",
+              value: 6.5,
+              source_column: "wins",
+              aggregation: "average",
+            },
           },
           {
             type: "table",
@@ -19,6 +25,7 @@ describe("ResponseBlocks", () => {
               columns: ["player_name", "wins"],
               column_labels: { player_name: "Player Name", wins: "Wins" },
               rows: [{ player_name: "Brad Jacobs", wins: 8 }],
+              title: null,
             },
           },
         ]}
@@ -84,6 +91,7 @@ describe("ResponseBlocks", () => {
                   difference: "38.1250000000000000",
                 },
               ],
+              title: null,
             },
           },
         ]}
@@ -106,6 +114,7 @@ describe("ResponseBlocks", () => {
               columns: ["draw_percentage"],
               column_labels: { draw_percentage: "Draw Percentage" },
               rows: [{ draw_percentage: 86 }],
+              title: null,
             },
           },
           {
@@ -117,6 +126,7 @@ describe("ResponseBlocks", () => {
               x_label: "Season",
               y_label: "Draw Percentage",
               points: [{ x: 2024, y: 86 }],
+              title: null,
             },
           },
         ]}

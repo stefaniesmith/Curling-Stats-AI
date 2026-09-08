@@ -17,6 +17,7 @@ Initial coverage verifies:
 * first-message creation and follow-up conversation IDs
 * sidebar history hydration and API-error feedback
 * Markdown, summary, and table artifact rendering
+* typed HTTP and SSE artifact-contract validation
 * multi-series chart colors, title wrapping, and legend spacing
 * streaming conversation IDs, deterministic progress statuses, and final Markdown event handling
 
