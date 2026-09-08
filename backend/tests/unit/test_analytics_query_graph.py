@@ -1,5 +1,3 @@
-import json
-
 from pydantic import SecretStr
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -9,6 +7,7 @@ from curlchat.agent.graph.analytics_query_graph import (
     AnalyticsQueryWorkflow,
     GeneratedAnalyticsQuery,
     OpenAISqlGenerator,
+    RepairContext,
     SqlGenerator,
     analytics_schema_description,
     sql_generation_prompt,
@@ -28,7 +27,7 @@ class StaticGenerator:
                 str,
                 tuple[ResolvedPlayerIdentity, ...],
                 tuple[ResolvedEventIdentity, ...],
-                str | None,
+                RepairContext | None,
             ]
         ] = []
 
@@ -37,9 +36,9 @@ class StaticGenerator:
         request: str,
         resolved_players: tuple[ResolvedPlayerIdentity, ...],
         resolved_events: tuple[ResolvedEventIdentity, ...],
-        repair_error: str | None = None,
+        repair_context: RepairContext | None = None,
     ) -> GeneratedAnalyticsQuery:
-        self.calls.append((request, resolved_players, resolved_events, repair_error))
+        self.calls.append((request, resolved_players, resolved_events, repair_context))
         return self.result
 
 
@@ -51,7 +50,7 @@ class SequenceGenerator:
                 str,
                 tuple[ResolvedPlayerIdentity, ...],
                 tuple[ResolvedEventIdentity, ...],
-                str | None,
+                RepairContext | None,
             ]
         ] = []
 
@@ -60,9 +59,9 @@ class SequenceGenerator:
         request: str,
         resolved_players: tuple[ResolvedPlayerIdentity, ...],
         resolved_events: tuple[ResolvedEventIdentity, ...],
-        repair_error: str | None = None,
+        repair_context: RepairContext | None = None,
     ) -> GeneratedAnalyticsQuery:
-        self.calls.append((request, resolved_players, resolved_events, repair_error))
+        self.calls.append((request, resolved_players, resolved_events, repair_context))
         return self._results.pop(0)
 
 
@@ -149,11 +148,11 @@ def test_retries_once_after_execution_failure_with_query_and_database_context() 
     assert result.rows == ({"display_name": "Brad Gushue"},)
     assert generator.calls[0] == ("Show Brad Gushue", (player,), (), None)
     assert generator.calls[1][:3] == ("Show Brad Gushue", (player,), ())
-    assert json.loads(generator.calls[1][3]) == {
-        "previous_sql": "SELECT missing_column FROM players WHERE id = :player_id",
-        "previous_parameters": {"player_id": 1},
-        "database_error": "no such column: missing_column",
-    }
+    assert generator.calls[1][3] == RepairContext(
+        previous_sql="SELECT missing_column FROM players WHERE id = :player_id",
+        previous_parameters={"player_id": 1},
+        database_error="no such column: missing_column",
+    )
 
 
 def test_returns_execution_failure_after_one_unsuccessful_repair_attempt() -> None:

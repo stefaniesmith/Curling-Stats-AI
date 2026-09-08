@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -70,18 +71,13 @@ def _validate_resolved_events(
     resolved_events: list[ResolvedEventIdentity] | tuple[ResolvedEventIdentity, ...],
 ) -> None:
     """Reject fabricated or inconsistent Event Resolver identity pairs."""
-    canonical_names = repository.display_names_by_id(tuple(event.event_id for event in resolved_events))
-    for event in resolved_events:
-        canonical_name = canonical_names.get(event.event_id)
-        if canonical_name is None:
-            raise ResolvedIdentityMismatchError(
-                f"The resolved event ID {event.event_id} does not exist. Resolve the event before querying."
-            )
-        if canonical_name != event.display_name:
-            raise ResolvedIdentityMismatchError(
-                f"Resolved event mismatch: ID {event.event_id} is {canonical_name!r}, "
-                f"not {event.display_name!r}. Resolve the event before querying."
-            )
+    _validate_resolved_identities(
+        resolved_events,
+        repository.display_names_by_id,
+        lambda event: event.event_id,
+        lambda event: event.display_name,
+        "event",
+    )
 
 
 def _validate_resolved_players(
@@ -89,19 +85,37 @@ def _validate_resolved_players(
     resolved_players: list[ResolvedPlayerIdentity] | tuple[ResolvedPlayerIdentity, ...],
 ) -> None:
     """Reject fabricated or inconsistent Player Resolver identity pairs."""
-    canonical_names = repository.display_names_by_id(
-        tuple(player.player_id for player in resolved_players)
+    _validate_resolved_identities(
+        resolved_players,
+        repository.display_names_by_id,
+        lambda player: player.player_id,
+        lambda player: player.display_name,
+        "player",
     )
-    for player in resolved_players:
-        canonical_name = canonical_names.get(player.player_id)
+
+
+def _validate_resolved_identities[ResolvedIdentity](
+    identities: Sequence[ResolvedIdentity],
+    display_names_by_id: Callable[[tuple[int, ...]], Mapping[int, str]],
+    identity_id: Callable[[ResolvedIdentity], int],
+    display_name: Callable[[ResolvedIdentity], str],
+    identity_type: str,
+) -> None:
+    """Reject claimed resolver identities that do not match their canonical records."""
+    canonical_names = display_names_by_id(tuple(identity_id(identity) for identity in identities))
+    for identity in identities:
+        identifier = identity_id(identity)
+        claimed_name = display_name(identity)
+        canonical_name = canonical_names.get(identifier)
         if canonical_name is None:
             raise ResolvedIdentityMismatchError(
-                f"The resolved player ID {player.player_id} does not exist. Resolve the player before querying."
+                f"The resolved {identity_type} ID {identifier} does not exist. "
+                f"Resolve the {identity_type} before querying."
             )
-        if canonical_name != player.display_name:
+        if canonical_name != claimed_name:
             raise ResolvedIdentityMismatchError(
-                f"Resolved player mismatch: ID {player.player_id} is {canonical_name!r}, "
-                f"not {player.display_name!r}. Resolve the player before querying."
+                f"Resolved {identity_type} mismatch: ID {identifier} is {canonical_name!r}, "
+                f"not {claimed_name!r}. Resolve the {identity_type} before querying."
             )
 
 

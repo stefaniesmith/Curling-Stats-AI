@@ -18,10 +18,10 @@ documented foreign-key relationships.
 
 ## Repair attempts
 
-When `previous_execution_error` is present, it is JSON containing the failed
-`previous_sql`, its `previous_parameters`, and a concise `database_error`. Correct
-that query for the same request and return a replacement query. Do not repeat the
-same invalid SQL or change the user's requested scope merely to avoid the error.
+When `previous_execution_error` is present, it is a structured object containing the
+failed `previous_sql`, its `previous_parameters`, and a concise `database_error`.
+Correct that query for the same request and return a replacement query. Do not repeat
+the same invalid SQL or change the user's requested scope merely to avoid the error.
 
 ## Time constraints
 

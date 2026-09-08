@@ -54,7 +54,7 @@ def test_exact_event_name_beats_a_broader_shorthand_match() -> None:
     assert resolution.event is not None
     assert resolution.event.display_name == "Brier"
     assert resolution.event.confidence == 1.0
-    assert resolution.has_records_for_resolved_players is None
+    assert resolution.has_any_records_for_resolved_players is None
 
 
 def test_reads_canonical_event_names_by_id() -> None:
@@ -101,7 +101,7 @@ def test_uses_resolved_player_statistics_to_disambiguate_an_event() -> None:
     assert resolution.status is EventResolutionStatus.MATCHED
     assert resolution.event is not None
     assert resolution.event.display_name == "Canada Cup (Men)"
-    assert resolution.has_records_for_resolved_players is True
+    assert resolution.has_any_records_for_resolved_players is True
 
 
 def test_reports_when_a_matched_event_has_no_records_for_resolved_players() -> None:
@@ -116,7 +116,7 @@ def test_reports_when_a_matched_event_has_no_records_for_resolved_players() -> N
         )
 
     assert resolution.status is EventResolutionStatus.MATCHED
-    assert resolution.has_records_for_resolved_players is False
+    assert resolution.has_any_records_for_resolved_players is False
 
 
 def test_resolves_a_clear_fuzzy_event_match() -> None:

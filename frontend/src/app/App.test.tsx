@@ -35,7 +35,13 @@ describe("App", () => {
           { type: "message_start", payload: { conversation_id: "conversation-id" } },
           { type: "markdown_delta", payload: { delta: "Answer: " } },
           { type: "markdown_delta", payload: { delta: body.message } },
-          { type: "artifact", payload: { type: "table", payload: { columns: ["wins"], rows: [{ wins: 8 }] } } },
+          {
+            type: "artifact",
+            payload: {
+              type: "table",
+              payload: { columns: ["wins"], column_labels: { wins: "Wins" }, rows: [{ wins: 8 }] },
+            },
+          },
           { type: "complete", payload: {} },
         ]);
       }
@@ -48,7 +54,7 @@ describe("App", () => {
     await user.type(composer, "Show Brier results");
     await user.keyboard("{Enter}");
     await screen.findByText("Answer: Show Brier results");
-    expect(screen.getByRole("columnheader", { name: "wins" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Wins" })).toBeInTheDocument();
 
     await user.type(composer, "Only after 2020");
     await user.keyboard("{Enter}");
@@ -70,7 +76,13 @@ describe("App", () => {
       if (String(input) === "/api/chat/stream") {
         return streamResponse([
           { type: "message_start", payload: { conversation_id: "conversation-id" } },
-          { type: "artifact", payload: { type: "table", payload: { columns: ["wins"], rows: [{ wins: 8 }] } } },
+          {
+            type: "artifact",
+            payload: {
+              type: "table",
+              payload: { columns: ["wins"], column_labels: { wins: "Wins" }, rows: [{ wins: 8 }] },
+            },
+          },
           { type: "markdown_delta", payload: { delta: "The answer is 8 wins." } },
           { type: "complete", payload: {} },
         ]);
@@ -82,10 +94,10 @@ describe("App", () => {
 
     await user.type(await screen.findByPlaceholderText(/ask about a player/i), "Show Brier results");
     await user.keyboard("{Enter}");
-    await screen.findByRole("columnheader", { name: "wins" });
+    await screen.findByRole("columnheader", { name: "Wins" });
 
     const assistant = screen.getByText("The answer is 8 wins.").closest("article");
-    expect(assistant?.textContent).toMatch(/The answer is 8 wins\.[\s\S]*wins/);
+    expect(assistant?.textContent).toMatch(/The answer is 8 wins\.[\s\S]*Wins/);
   });
 
   it("hydrates persisted messages when a sidebar conversation is selected", async () => {

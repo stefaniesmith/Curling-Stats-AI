@@ -28,7 +28,7 @@ class EventResolutionToolResult(BaseModel):
     query: str
     status: EventResolutionStatus
     matches: tuple[ResolvedEventMatch, ...] = Field(default_factory=tuple)
-    has_records_for_resolved_players: bool | None = None
+    has_any_records_for_resolved_players: bool | None = None
 
 
 def resolve_event_name(
@@ -77,5 +77,5 @@ def resolve_event(
             )
             for match in resolution.matches
         ),
-        has_records_for_resolved_players=resolution.has_records_for_resolved_players,
+        has_any_records_for_resolved_players=resolution.has_any_records_for_resolved_players,
     ).model_dump_json()

@@ -30,6 +30,14 @@ class GeneratedAnalyticsQuery(BaseModel):
     reason: str | None = Field(default=None, description="Reason a request is unsupported, if applicable.")
 
 
+class RepairContext(BaseModel):
+    """The prior failed query details available for the single repair attempt."""
+
+    previous_sql: str
+    previous_parameters: dict[str, Any]
+    database_error: str
+
+
 class AnalyticsQueryState(BaseModel):
     """Pydantic state shared by the Analytics Query Tool's internal graph."""
 
@@ -41,7 +49,7 @@ class AnalyticsQueryState(BaseModel):
     generated_query: GeneratedAnalyticsQuery | None = None
     result: AnalyticsQueryResult | None = None
     retry_count: int = 0
-    repair_error: str | None = None
+    repair_context: RepairContext | None = None
     retryable: bool = False
 
 
@@ -53,7 +61,7 @@ class SqlGenerator(Protocol):
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity],
         resolved_events: Sequence[ResolvedEventIdentity],
-        repair_error: str | None = None,
+        repair_context: RepairContext | None = None,
     ) -> GeneratedAnalyticsQuery: ...
 
 
@@ -81,7 +89,7 @@ class OpenAISqlGenerator:
         request: str,
         resolved_players: Sequence[ResolvedPlayerIdentity],
         resolved_events: Sequence[ResolvedEventIdentity],
-        repair_error: str | None = None,
+        repair_context: RepairContext | None = None,
     ) -> GeneratedAnalyticsQuery:
         result = self._model.invoke(
             [
@@ -96,7 +104,9 @@ class OpenAISqlGenerator:
                             "resolved_events": [
                                 event.model_dump() for event in resolved_events
                             ],
-                            "previous_execution_error": repair_error,
+                            "previous_execution_error": (
+                                repair_context.model_dump() if repair_context is not None else None
+                            ),
                         }
                     )
                 ),
@@ -155,7 +165,7 @@ class AnalyticsQueryWorkflow:
                 state.request,
                 state.resolved_players,
                 state.resolved_events,
-                state.repair_error,
+                state.repair_context,
             )
         except (OpenAIError, TypeError, ValueError):
             return {
@@ -169,7 +179,7 @@ class AnalyticsQueryWorkflow:
             "result": None,
             "retryable": False,
         }
-        if state.repair_error is not None:
+        if state.repair_context is not None:
             updates["retry_count"] = state.retry_count + 1
         return updates
 
@@ -211,15 +221,12 @@ class AnalyticsQueryWorkflow:
             }
         updates: dict[str, object] = {"result": result, "retryable": retryable}
         if retryable and state.retry_count < 1:
-            updates["repair_error"] = json.dumps(
-                {
-                    "previous_sql": generated_query.sql,
-                    "previous_parameters": generated_query.parameters,
-                    "database_error": result.repair_error
-                    or result.message
-                    or "The previous query could not run.",
-                },
-                default=str,
+            updates["repair_context"] = RepairContext(
+                previous_sql=generated_query.sql,
+                previous_parameters=generated_query.parameters,
+                database_error=result.repair_error
+                or result.message
+                or "The previous query could not run.",
             )
         return updates
 

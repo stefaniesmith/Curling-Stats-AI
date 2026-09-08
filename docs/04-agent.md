@@ -53,6 +53,8 @@ or averaging row percentages. The prompt gives the SQL generator an explicit
 leaving the weighted calculation implicit. Generated result aliases remain
 user-facing statistic names rather than exposing calculation details such as
 “weighted.”
+The one permitted SQL repair receives a typed context model containing the
+previous SQL, bound parameters, and concise database diagnostic.
 
 After successful analytical queries, the main agent creates useful
 visualizations proactively rather than asking permission in a follow-up turn.

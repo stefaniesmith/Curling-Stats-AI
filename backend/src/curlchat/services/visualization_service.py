@@ -155,6 +155,9 @@ class VisualizationService:
                 type=VisualizationType.TABLE,
                 payload={
                     "columns": result.columns,
+                    "column_labels": {
+                        column: self._display_label(column) for column in result.columns
+                    },
                     "rows": result.rows,
                     "title": spec.title,
                 },
@@ -189,6 +192,8 @@ class VisualizationService:
             "chart_type": spec.chart_type,
             "x_column": mapping.x_column,
             "y_column": mapping.y_column,
+            "x_label": self._display_label(mapping.x_column),
+            "y_label": self._display_label(mapping.y_column),
             "title": spec.title,
         }
         if mapping.series_column is None:
@@ -223,6 +228,8 @@ class VisualizationService:
             "chart_type": spec.chart_type,
             "x_column": "statistic",
             "y_column": "value",
+            "x_label": "Statistic",
+            "y_label": "Value",
             "value_columns": mapping.value_columns,
             "title": spec.title,
         }
@@ -258,7 +265,7 @@ class VisualizationService:
         return VisualizationArtifact(
             type=VisualizationType.SUMMARY,
             payload={
-                "label": f"{spec.aggregation.value.title()} {spec.value_column}",
+                "label": f"{spec.aggregation.value.title()} {self._display_label(spec.value_column)}",
                 "value": value,
                 "source_column": spec.value_column,
                 "aggregation": spec.aggregation,

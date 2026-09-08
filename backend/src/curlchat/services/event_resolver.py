@@ -42,7 +42,7 @@ class EventResolution(BaseModel):
     query: str
     status: EventResolutionStatus
     matches: tuple[ResolvedEvent, ...]
-    has_records_for_resolved_players: bool | None = None
+    has_any_records_for_resolved_players: bool | None = None
 
     @property
     def event(self) -> ResolvedEvent | None:
@@ -51,7 +51,7 @@ class EventResolution(BaseModel):
 
 
 class EventResolver:
-    """Resolve event names without accessing player statistics."""
+    """Resolve event names, consulting player statistics for availability and disambiguation."""
 
     def __init__(self, repository: EventRepository) -> None:
         self._repository = repository
@@ -162,7 +162,7 @@ class EventResolver:
             query=query,
             status=status,
             matches=narrowed_matches,
-            has_records_for_resolved_players=has_records,
+            has_any_records_for_resolved_players=has_records,
         )
 
     def _narrow_by_player_statistics(

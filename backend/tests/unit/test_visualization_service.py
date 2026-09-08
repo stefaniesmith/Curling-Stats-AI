@@ -34,6 +34,7 @@ def test_creates_a_table_artifact() -> None:
     assert artifact.type is VisualizationType.TABLE
     assert artifact.payload == {
         "columns": ("display_name", "wins"),
+        "column_labels": {"display_name": "Display Name", "wins": "Wins"},
         "rows": ({"display_name": "Brad Jacobs", "wins": 6},),
         "title": "Canada Cup results",
     }
@@ -58,6 +59,8 @@ def test_creates_a_line_chart_artifact() -> None:
 
     assert artifact.type is VisualizationType.CHART
     assert artifact.payload["chart_type"] is ChartType.LINE
+    assert artifact.payload["x_label"] == "Event Year"
+    assert artifact.payload["y_label"] == "Wins"
     assert artifact.payload["points"] == ({"x": 2023, "y": 6}, {"x": 2024, "y": 8})
 
 
@@ -140,7 +143,7 @@ def test_creates_an_average_summary_artifact() -> None:
         )
     )
 
-    assert artifact.payload["label"] == "Average shots_percent"
+    assert artifact.payload["label"] == "Average Shots"
     assert artifact.payload["value"] == 85
 
 
@@ -225,6 +228,7 @@ def test_tool_creates_an_artifact_from_a_typed_result() -> None:
         "type": "table",
         "payload": {
             "columns": ["display_name", "wins"],
+            "column_labels": {"display_name": "Display Name", "wins": "Wins"},
             "rows": [{"display_name": "Brad Jacobs", "wins": 6}],
             "title": None,
         },

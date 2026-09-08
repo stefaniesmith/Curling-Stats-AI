@@ -138,6 +138,7 @@ used by the Analytics Query Tool.
 * match an exact event display name or source slug
 * match clear event shorthand or spelling variations
 * return ambiguity rather than silently combining distinct competitions
+* consult raw player statistics for disambiguation and baseline availability
 
 ### Inputs
 
@@ -157,6 +158,9 @@ When resolved player identities are supplied, the resolver may narrow an
 ambiguous event only if exactly one candidate contains source statistics for
 every supplied player. This is a data-based disambiguation rule; it does not
 infer personal attributes from a player's name.
+For an unambiguous match, `has_any_records_for_resolved_players` reports whether
+every supplied player has at least one raw imported stint at that event. It does
+not apply the request's year range, alternate filter, or metric availability.
 
 ---
 
@@ -211,8 +215,9 @@ This separation allows the internal implementation to evolve independently while
 The current implementation invokes a two-node internal LangGraph from the
 agent layer, with Pydantic state: an LLM generation node produces a structured
 query, then a deterministic node checks the one-statement contract and executes
-it. A validation or execution failure returns the failed SQL, bound parameters,
-and a concise database diagnostic to the generation node for one repair attempt;
+it. A validation or execution failure returns a typed repair context containing
+the failed SQL, bound parameters, and concise database diagnostic to the generation
+node for one repair attempt;
 the user-facing error remains sanitized. A second failure is returned as an execution failure; a
 model-declared unsupported request does not retry.
 
@@ -233,10 +238,11 @@ Player Resolver and Event Resolver display-name/ID pair against the imported
 identity catalogs. A mismatch is rejected rather than querying an identity
 identified by a fabricated ID.
 
-When Player Resolver identities are supplied to the Event Resolver, its result
-also reports whether the matched event has imported records for every supplied
-player. This is availability context only; it does not alter the resolved event
-identity or apply the user's year and statistic filters.
+When Player Resolver identities are supplied to the Event Resolver, its
+`has_any_records_for_resolved_players` result reports whether the matched event
+has at least one raw imported stint for every supplied player. This baseline
+availability context does not alter the resolved event identity or apply the
+user's year, alternate, or statistic filters.
 
 The agent-facing contract accepts an analytical request and resolved player
 identity pairs (`display_name` and `player_id`), not SQL. Keeping each name
@@ -293,13 +299,14 @@ The frontend is responsible for rendering these artifacts into interactive user 
 The first implementation creates exactly one artifact per tool call. It
 supports:
 
-* `table`, preserving the analytics columns and rows
+* `table`, preserving the analytics columns and rows, plus backend-generated display labels
 * `summary`, using an explicit deterministic `average`, `minimum`, `maximum`,
   or `sum` over one numeric result column
 * `chart`, using an explicit `bar`, `line`, or `dot` renderer and either a
   `long` row-based mapping with validated x- and numeric y-axis columns, or a
   `wide` mapping that reshapes selected numeric stat columns into categories;
-  an optional series column produces grouped bars or multiple line/dot traces
+  an optional series column produces grouped bars or multiple line/dot traces;
+  the payload includes backend-generated x- and y-axis labels
 
 The agent decides whether an artifact improves the answer and, for a chart,
 which supported renderer suits the result. The service validates its selected

@@ -6,7 +6,7 @@ CurlChat uses focused tests at the layer that owns each behavior. Deterministic 
 
 ## Backend
 
-Backend unit tests use pytest and FastAPI's test client. They mock provider calls and database-facing boundaries where appropriate. Route coverage includes synchronous chat error translation, conversation metadata serialization, and persisted-history reconstruction. Run the suite with `uv run pytest -q` from the backend directory; run `uv run ruff check src tests` for linting.
+Backend unit tests use pytest and FastAPI's test client. They mock provider calls and database-facing boundaries where appropriate. The default local URLs, Compose runtime URLs, and role provisioning all use `POSTGRES_PASSWORD` (defaulting to `curlchat`), so no tests need to be deselected for state-checkpointer authentication. Route coverage includes synchronous chat error translation, conversation metadata serialization, and persisted-history reconstruction. Run the suite with `uv run pytest -q` from the backend directory; run `uv run ruff check src tests` for linting.
 
 ## Frontend
 

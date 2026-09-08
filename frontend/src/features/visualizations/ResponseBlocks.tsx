@@ -34,16 +34,9 @@ const displayValue = (value: unknown) => {
   return value == null ? "—" : String(value);
 };
 
-const displayAxisLabel = (value: unknown) => {
-  const label = String(value ?? "")
-    .replaceAll("_", " ")
-    .replace(/\binturns?\b/gi, (match) => (match.endsWith("s") ? "in-turns" : "in-turn"))
-    .replace(/\boutturns?\b/gi, (match) => (match.endsWith("s") ? "out-turns" : "out-turn"));
-  return label ? `${label[0].toUpperCase()}${label.slice(1)}` : "";
-};
-
 function TableBlock({ payload }: { payload: Record<string, unknown> }) {
   const columns = Array.isArray(payload.columns) ? payload.columns.map(String) : [];
+  const columnLabels = payload.column_labels as Record<string, string>;
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
   const title = typeof payload.title === "string" ? payload.title : null;
 
@@ -52,7 +45,7 @@ function TableBlock({ payload }: { payload: Record<string, unknown> }) {
       {title && <h3>{title}</h3>}
       <div className="table-scroll">
         <table>
-          <thead><tr>{columns.map((column) => <th key={column}>{column.replaceAll("_", " ")}</th>)}</tr></thead>
+          <thead><tr>{columns.map((column) => <th key={column}>{columnLabels[column]}</th>)}</tr></thead>
           <tbody>
             {rows.map((row, index) => (
               <tr key={index}>
@@ -68,7 +61,7 @@ function TableBlock({ payload }: { payload: Record<string, unknown> }) {
 
 function SummaryBlock({ payload }: { payload: Record<string, unknown> }) {
   const title = typeof payload.title === "string" ? payload.title : null;
-  const label = typeof payload.label === "string" ? payload.label.replaceAll("_", " ") : "Summary";
+  const label = typeof payload.label === "string" ? payload.label : "Summary";
   return (
     <section className="artifact summary-card">
       <span>{title ?? label}</span>
@@ -120,11 +113,11 @@ function ChartBlock({ payload }: { payload: Record<string, unknown> }) {
           plot_bgcolor: "rgba(234,244,251,0.6)",
           font: { family: "Inter, system-ui, sans-serif", color: "#19325d" },
           xaxis: {
-            title: { text: displayAxisLabel(payload.x_column), standoff: 18 },
+            title: { text: payload.x_label, standoff: 18 },
             gridcolor: "rgba(7,31,79,.08)",
           },
           yaxis: {
-            title: displayAxisLabel(payload.y_column),
+            title: payload.y_label,
             gridcolor: "rgba(7,31,79,.1)",
             zerolinecolor: "rgba(7,31,79,.2)",
           },

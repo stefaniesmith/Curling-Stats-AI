@@ -34,11 +34,13 @@ Selecting a previous conversation fetches its persisted history from `GET /api/c
 The UI treats `blocks` from the chat response as the rendering contract. Supported blocks are:
 
 * `markdown` with `payload.content`
-* `table` with `payload.columns`, `payload.rows`, and optional `payload.title`
+* `table` with `payload.columns`, backend-provided `payload.column_labels`,
+  `payload.rows`, and optional `payload.title`
 * `summary` with label, numeric value, and optional title
-* `chart` with `bar`, `line`, or `dot` points or named series
+* `chart` with `bar`, `line`, or `dot` points or named series, plus backend-provided
+  `x_label` and `y_label`
 
-Charts are rendered by Plotly in the browser. The backend Visualization Service remains the authority for chart types, mappings, and payload construction.
+Charts are rendered by Plotly in the browser. The backend Visualization Service remains the authority for chart types, mappings, payload construction, and display labels.
 
 ## Development
 

@@ -7,9 +7,9 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://curlchat_app:curlchat_app@localhost:5432/curlchat"
+    database_url: str = "postgresql+psycopg://curlchat_app:curlchat@localhost:5432/curlchat"
     state_database_url: str = (
-        "postgresql+psycopg://curlchat_state:curlchat_state@localhost:5432/curlchat"
+        "postgresql+psycopg://curlchat_state:curlchat@localhost:5432/curlchat"
     )
     admin_database_url: str = "postgresql+psycopg://curlchat_owner:curlchat@localhost:5432/curlchat"
     openai_api_key: SecretStr | None = None
