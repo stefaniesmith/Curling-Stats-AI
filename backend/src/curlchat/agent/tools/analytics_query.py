@@ -113,15 +113,21 @@ class ResolvedIdentityMismatchError(ValueError):
 def query_analytics(
     request: Annotated[
         str,
-        Field(description="The user's analytical question in natural language, never SQL."),
+        Field(
+            description=(
+                "A concise natural-language statement of the user's analytical request, never SQL. "
+                "Retain every stated constraint—such as years, competition, players, filters, thresholds, "
+                "ranking, and requested output—while you may normalize wording for clarity."
+            )
+        ),
     ],
     tool_call_id: Annotated[str, InjectedToolCallId],
     resolved_players: Annotated[
         list[ResolvedPlayerIdentity] | None,
         Field(
             description=(
-                "Successful Player Resolver results only. Each display_name/player_id pair "
-                "preserves the identity mapping for this request."
+                "Exact, unchanged display_name/player_id pairs from successful Player Resolver "
+                "results only. Never reconstruct, modify, or invent identities."
             )
         ),
     ] = None,
@@ -129,13 +135,13 @@ def query_analytics(
         list[ResolvedEventIdentity] | None,
         Field(
             description=(
-                "Successful Event Resolver results only. Each display_name/event_id pair "
-                "preserves the event identity for this request."
+                "Exact, unchanged display_name/event_id pairs from successful Event Resolver "
+                "results only. Never reconstruct, modify, or invent identities."
             )
         ),
     ] = None,
 ) -> Command:
-    """Answer an analytical request using resolved identities; never provide SQL."""
+    """Answer a statistics request after identity resolution; never provide SQL."""
     result = run_analytics_query(request, resolved_players, resolved_events)
     update: dict[str, object] = {
         "messages": [

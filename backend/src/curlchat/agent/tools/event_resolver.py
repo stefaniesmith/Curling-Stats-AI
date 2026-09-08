@@ -41,14 +41,21 @@ def resolve_event_name(
 def resolve_event(
     name: Annotated[
         str,
-        Field(description="The event name exactly as the user expressed it, including shorthand. Omit years."),
+        Field(
+            description=(
+                "Use the competition catalog in the system prompt to choose the appropriate "
+                "canonical competition name or documented alias for the user's request. Do not "
+                "invent a name or alias. Pass one competition name without years or database IDs."
+            )
+        ),
     ],
     resolved_players: Annotated[
         list[ResolvedPlayerIdentity] | None,
         Field(
             description=(
                 "Successful Player Resolver results, when available. The resolver uses these "
-                "identity pairs only to disambiguate otherwise matching events from source statistics."
+                "exact, unchanged identity pairs only to disambiguate otherwise matching events "
+                "from source statistics."
             )
         ),
     ] = None,

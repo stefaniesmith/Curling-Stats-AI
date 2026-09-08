@@ -50,8 +50,9 @@ def create_visualization(
         VisualizationSpec,
         Field(
             description=(
-                "A typed table, summary, or chart specification for the latest successful analytics "
-                "result. Select columns and mappings only; do not pass or reproduce result rows."
+                "Call only after a successful analytics query. Provide a typed table, summary, or "
+                "chart specification for the latest result, using result-column names exactly. Select "
+                "columns and mappings only; do not pass, reproduce, or transform result rows."
             )
         ),
     ],

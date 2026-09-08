@@ -75,22 +75,28 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
         "The player name exactly as the user expressed it, including an alias or misspelling."
     )
     assert query_schema["properties"]["request"]["description"] == (
-        "The user's analytical question in natural language, never SQL."
+        "A concise natural-language statement of the user's analytical request, never SQL. Retain every "
+        "stated constraint—such as years, competition, players, filters, thresholds, ranking, and requested "
+        "output—while you may normalize wording for clarity."
     )
 
-    assert "Successful Player Resolver results only" in query_schema["properties"]["resolved_players"][
-        "description"
-    ]
+    assert query_schema["properties"]["resolved_players"]["description"] == (
+        "Exact, unchanged display_name/player_id pairs from successful Player Resolver results only. "
+        "Never reconstruct, modify, or invent identities."
+    )
     assert set(event_resolver_schema["properties"]) == {"name", "resolved_players"}
     assert event_resolver_schema["properties"]["name"]["description"] == (
-        "The event name exactly as the user expressed it, including shorthand. Omit years."
+        "Use the competition catalog in the system prompt to choose the appropriate canonical "
+        "competition name or documented alias for the user's request. Do not invent a name or alias. "
+        "Pass one competition name without years or database IDs."
     )
     assert "disambiguate otherwise matching events" in event_resolver_schema["properties"][
         "resolved_players"
     ]["description"]
-    assert "Successful Event Resolver results only" in query_schema["properties"]["resolved_events"][
-        "description"
-    ]
+    assert query_schema["properties"]["resolved_events"]["description"] == (
+        "Exact, unchanged display_name/event_id pairs from successful Event Resolver results only. "
+        "Never reconstruct, modify, or invent identities."
+    )
     system_prompt = captured["graph"]["prompt"]  # type: ignore[index]
     assert "Never generate, request, expose, or explain SQL" in system_prompt
     assert "Hearts | 1982–2025 | Available" in system_prompt
@@ -103,8 +109,9 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert "bar chart visualization" in system_prompt
     assert set(visualization_schema["properties"]) == {"spec"}
     assert visualization_schema["properties"]["spec"]["description"] == (
-        "A typed table, summary, or chart specification for the latest successful analytics "
-        "result. Select columns and mappings only; do not pass or reproduce result rows."
+        "Call only after a successful analytics query. Provide a typed table, summary, or chart "
+        "specification for the latest result, using result-column names exactly. Select columns and "
+        "mappings only; do not pass, reproduce, or transform result rows."
     )
 
 
