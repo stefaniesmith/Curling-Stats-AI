@@ -34,6 +34,10 @@ On a user's first message, the UI omits `conversation_id`. The API creates the c
 
 Selecting a previous conversation fetches its persisted history from `GET /api/conversations/{conversation_id}/messages`, disables the composer during hydration, and renders the returned user and assistant blocks. The server owns history reconstruction from LangGraph state; the browser never reads checkpointer tables or recreates artifacts.
 
+Changing or starting a conversation cancels any in-flight history load or chat
+stream. A view-version guard also discards stale responses that arrive after a
+new selection, so an older request cannot replace the active transcript.
+
 ## Response Blocks
 
 The UI treats `blocks` from the chat response as the rendering contract. Supported blocks are:

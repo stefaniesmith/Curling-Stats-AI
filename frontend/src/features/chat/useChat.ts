@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, getConversationMessages, listConversations, streamMessage } from "../../lib/api";
+import {
+  ApiError,
+  getConversationMessages,
+  isRequestAborted,
+  listConversations,
+  streamMessage,
+} from "../../lib/api";
 import type { ArtifactBlock, Conversation, ResponseBlock } from "../../types/api";
 import type { ChatMessage } from "./types";
 
@@ -14,6 +20,9 @@ export function useChat() {
   const [activity, setActivity] = useState<string>();
   const [error, setError] = useState<string>();
   const [composerKey, setComposerKey] = useState(0);
+  const viewVersion = useRef(0);
+  const historyController = useRef<AbortController>();
+  const streamController = useRef<AbortController>();
 
   const refreshConversations = useCallback(async () => {
     setIsLoadingConversations(true);
@@ -30,48 +39,77 @@ export function useChat() {
     void refreshConversations();
   }, [refreshConversations]);
 
+  useEffect(
+    () => () => {
+      historyController.current?.abort();
+      streamController.current?.abort();
+    },
+    [],
+  );
+
+  const invalidateCurrentView = useCallback(() => {
+    viewVersion.current += 1;
+    historyController.current?.abort();
+    streamController.current?.abort();
+  }, []);
+
   const newConversation = useCallback(() => {
+    invalidateCurrentView();
     setActiveConversationId(undefined);
     setMessages([]);
     setError(undefined);
     setActivity(undefined);
+    setIsSending(false);
     setIsLoadingHistory(false);
     setComposerKey((current) => current + 1);
-  }, []);
+  }, [invalidateCurrentView]);
 
-  const selectConversation = useCallback(async (id: string) => {
-    setActiveConversationId(id);
-    setMessages([]);
-    setError(undefined);
-    setActivity(undefined);
-    setIsLoadingHistory(true);
-    try {
-      const history = await getConversationMessages(id);
-      setMessages(
-        history.map((message) => ({
-          id: crypto.randomUUID(),
-          role: message.role,
-          content: message.role === "user" ? message.content : undefined,
-          blocks: message.role === "assistant" ? message.blocks : undefined,
-        })),
-      );
-    } catch (cause) {
-      const apiError =
-        cause instanceof ApiError ? cause : new ApiError("Could not load this conversation.");
-      setError(
-        apiError.status === 404
-          ? "This conversation is no longer available. Start a new one to continue."
-          : apiError.message,
-      );
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, []);
+  const selectConversation = useCallback(
+    async (id: string) => {
+      invalidateCurrentView();
+      const version = viewVersion.current;
+      const controller = new AbortController();
+      historyController.current = controller;
+      setActiveConversationId(id);
+      setMessages([]);
+      setError(undefined);
+      setActivity(undefined);
+      setIsSending(false);
+      setIsLoadingHistory(true);
+      try {
+        const history = await getConversationMessages(id, controller.signal);
+        if (version !== viewVersion.current) return;
+        setMessages(
+          history.map((message) => ({
+            id: crypto.randomUUID(),
+            role: message.role,
+            content: message.role === "user" ? message.content : undefined,
+            blocks: message.role === "assistant" ? message.blocks : undefined,
+          })),
+        );
+      } catch (cause) {
+        if (isRequestAborted(cause) || version !== viewVersion.current) return;
+        const apiError =
+          cause instanceof ApiError ? cause : new ApiError("Could not load this conversation.");
+        setError(
+          apiError.status === 404
+            ? "This conversation is no longer available. Start a new one to continue."
+            : apiError.message,
+        );
+      } finally {
+        if (version === viewVersion.current) setIsLoadingHistory(false);
+      }
+    },
+    [invalidateCurrentView],
+  );
 
   const sendMessage = useCallback(
     async (message: string) => {
       const trimmed = message.trim();
       if (!trimmed || isSending) return;
+      const version = viewVersion.current;
+      const controller = new AbortController();
+      streamController.current = controller;
       setError(undefined);
       setActivity("Resolving context");
       setMessages((current) => [
@@ -82,6 +120,7 @@ export function useChat() {
       const assistantMessageId = crypto.randomUUID();
       const pendingArtifacts: ArtifactBlock[] = [];
       const appendAssistantBlock = (block: ResponseBlock) => {
+        if (version !== viewVersion.current) return;
         setMessages((current) => {
           const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
           if (assistantIndex === -1) {
@@ -97,6 +136,7 @@ export function useChat() {
         await streamMessage(
           { message: trimmed, conversation_id: activeConversationId },
           (event) => {
+            if (version !== viewVersion.current) return;
             if (event.type === "message_start") {
               setActiveConversationId(event.payload.conversation_id);
             } else if (event.type === "status") {
@@ -136,9 +176,11 @@ export function useChat() {
               pendingArtifacts.forEach(appendAssistantBlock);
             }
           },
+          controller.signal,
         );
-        await refreshConversations();
+        if (version === viewVersion.current) await refreshConversations();
       } catch (cause) {
+        if (isRequestAborted(cause) || version !== viewVersion.current) return;
         const apiError =
           cause instanceof ApiError
             ? cause
@@ -149,8 +191,10 @@ export function useChat() {
             : apiError.message,
         );
       } finally {
-        setIsSending(false);
-        setActivity(undefined);
+        if (version === viewVersion.current) {
+          setIsSending(false);
+          setActivity(undefined);
+        }
       }
     },
     [activeConversationId, isSending, refreshConversations],

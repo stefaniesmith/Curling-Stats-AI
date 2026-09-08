@@ -150,7 +150,111 @@ describe("App", () => {
 
     expect(await screen.findByText("Show historic results")).toBeInTheDocument();
     expect(screen.getByText("Historic answer")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/conversations/history-id/messages", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/conversations/history-id/messages",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
+  it("keeps the most recently selected conversation when an earlier history load finishes late", async () => {
+    let resolveFirstHistory: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/conversations") {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              id: "first-id",
+              title: "First conversation",
+              created_at: "2026-09-06T00:00:00Z",
+              updated_at: "2026-09-06T00:00:00Z",
+            },
+            {
+              id: "second-id",
+              title: "Second conversation",
+              created_at: "2026-09-06T00:00:00Z",
+              updated_at: "2026-09-06T00:00:00Z",
+            },
+          ]),
+        );
+      }
+      if (url === "/api/conversations/first-id/messages") {
+        return new Promise((resolve) => {
+          resolveFirstHistory = resolve;
+        });
+      }
+      if (url === "/api/conversations/second-id/messages") {
+        return Promise.resolve(
+          jsonResponse([{ role: "user", content: "Second conversation message", blocks: [] }]),
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: /first conversation/i }));
+    await user.click(screen.getByRole("button", { name: /second conversation/i }));
+    expect(await screen.findByText("Second conversation message")).toBeInTheDocument();
+
+    resolveFirstHistory!(
+      jsonResponse([{ role: "user", content: "Stale first conversation message", blocks: [] }]),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("Stale first conversation message")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("Second conversation message")).toBeInTheDocument();
+  });
+
+  it("does not render a cancelled stream after selecting another conversation", async () => {
+    let resolveStream: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/conversations") {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              id: "history-id",
+              title: "Saved conversation",
+              created_at: "2026-09-06T00:00:00Z",
+              updated_at: "2026-09-06T00:00:00Z",
+            },
+          ]),
+        );
+      }
+      if (url === "/api/chat/stream") {
+        return new Promise((resolve) => {
+          resolveStream = resolve;
+        });
+      }
+      if (url === "/api/conversations/history-id/messages") {
+        return Promise.resolve(
+          jsonResponse([{ role: "user", content: "Saved conversation message", blocks: [] }]),
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    const composer = await screen.findByPlaceholderText(/ask about a player/i);
+    await user.type(composer, "Question for the new conversation");
+    await user.keyboard("{Enter}");
+    await user.click(screen.getByRole("button", { name: /saved conversation/i }));
+    expect(await screen.findByText("Saved conversation message")).toBeInTheDocument();
+
+    resolveStream!(
+      streamResponse([
+        { type: "message_start", payload: { conversation_id: "stale-conversation-id" } },
+        { type: "markdown_delta", payload: { delta: "Stale streamed answer" } },
+      ]),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("Stale streamed answer")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("Saved conversation message")).toBeInTheDocument();
   });
 
   it("clears an unsent draft when starting a new conversation", async () => {

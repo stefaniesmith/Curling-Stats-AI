@@ -26,7 +26,8 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(path, init);
-  } catch {
+  } catch (cause) {
+    if (isRequestAborted(cause)) throw cause;
     throw new ApiError("CurlChat could not reach the API. Start the FastAPI server and try again.");
   }
 
@@ -42,8 +43,11 @@ export const listConversations = async (): Promise<Conversation[]> =>
 
 export const getConversationMessages = async (
   conversationId: string,
+  signal?: AbortSignal,
 ): Promise<ConversationMessage[]> =>
-  parseConversationMessages(await request(`/api/conversations/${conversationId}/messages`));
+  parseConversationMessages(
+    await request(`/api/conversations/${conversationId}/messages`, { signal }),
+  );
 
 export const sendMessage = async (body: ChatRequest): Promise<ChatResponse> =>
   parseChatResponse(
@@ -57,11 +61,13 @@ export const sendMessage = async (body: ChatRequest): Promise<ChatResponse> =>
 export async function streamMessage(
   body: ChatRequest,
   onEvent: (event: ChatStreamEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch("/api/chat/stream", {
     method: "POST",
     headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
@@ -94,6 +100,10 @@ export async function streamMessage(
     }
     if (done) break;
   }
+}
+
+export function isRequestAborted(cause: unknown): boolean {
+  return cause instanceof DOMException && cause.name === "AbortError";
 }
 
 function parseStreamEvent(
