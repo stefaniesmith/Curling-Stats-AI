@@ -11,7 +11,7 @@ from curlchat.agent.graph.app_graph import (
     stream_response,
 )
 from curlchat.api.routes.conversations import get_conversation_service
-from curlchat.api.schemas.chat import ChatRequest, ChatResponse
+from curlchat.api.schemas.chat import ChatRequest, ChatResponse, artifact_block, markdown_block
 from curlchat.services.conversation_service import ConversationNotFoundError
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -47,11 +47,8 @@ def create_chat_response(request: ChatRequest) -> ChatResponse:
         conversation_id=conversation.id,
         message=response.message,
         blocks=[
-            {"type": "markdown", "payload": {"content": response.message}},
-            *(
-                {"type": artifact.type, "payload": artifact.payload}
-                for artifact in response.artifacts
-            ),
+            markdown_block(response.message),
+            *(artifact_block(artifact.model_dump()) for artifact in response.artifacts),
         ],
     )
 
@@ -76,7 +73,12 @@ def stream_chat_response(request: ChatRequest) -> StreamingResponse:
         yield _sse_event("message_start", {"conversation_id": str(conversation.id)})
         try:
             for event in stream_response(request.message, conversation.id):
-                yield _sse_event(event.type, event.payload)
+                payload = (
+                    artifact_block(event.payload).model_dump(mode="json")
+                    if event.type == "artifact"
+                    else event.payload
+                )
+                yield _sse_event(event.type, payload)
             conversation_service.touch(conversation.id)
         except AgentConfigurationError:
             yield _sse_event("error", {"detail": "The chat service is not configured."})

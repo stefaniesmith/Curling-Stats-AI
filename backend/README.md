@@ -1,17 +1,17 @@
 # CurlChat backend
 
-Initial backend scaffold aligned with the repository architecture docs.
+FastAPI, PostgreSQL, and LangGraph provide CurlChat's conversational analytics
+backend. The application keeps orchestration, deterministic services,
+repositories, API routes, and archive ingestion as explicit layers.
 
-Planned implementation order:
+## Included capabilities
 
-1. Import pipeline
-2. Player resolver service
-3. Stats service
-4. LangGraph tool wrappers
-5. Conversation persistence
-6. Streaming chat endpoint
+* idempotent Curling Canada archive import and Alembic migrations
+* deterministic player and event resolution
+* read-only, bounded analytics SQL execution through a restricted database role
+* LangGraph conversation persistence, streaming, and frontend-ready artifacts
 
-Suggested local commands after dependencies are installed:
+## Run locally
 
 - `uv sync`
 - `uv run alembic upgrade head`
@@ -24,3 +24,8 @@ Suggested local commands after dependencies are installed:
 `DATABASE_URL` uses the `curlchat_app` runtime role, which has `SELECT` access
 to the analytics tables only. `STATE_DATABASE_URL` uses `curlchat_state`, which
 can access conversation metadata and LangGraph checkpoint tables only.
+
+## Quality checks
+
+Run `uv run ruff check src tests` for linting and `uv run pytest -q` for the
+backend test suite.

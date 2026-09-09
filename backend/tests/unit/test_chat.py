@@ -1,6 +1,8 @@
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from curlchat.agent.graph.app_graph import (
     AgentConfigurationError,
@@ -8,6 +10,7 @@ from curlchat.agent.graph.app_graph import (
     AgentResponse,
     AgentStreamEvent,
 )
+from curlchat.api.schemas.chat import artifact_block
 from curlchat.main import app
 from curlchat.services.conversation_service import ConversationMetadata, ConversationNotFoundError
 from curlchat.services.visualization_service import VisualizationArtifact, VisualizationType
@@ -53,7 +56,12 @@ def test_chat_returns_an_agent_response(monkeypatch) -> None:
             artifacts=(
                 VisualizationArtifact(
                     type=VisualizationType.TABLE,
-                    payload={"columns": ["wins"], "rows": [{"wins": 8}]},
+                    payload={
+                        "columns": ["wins"],
+                        "column_labels": {"wins": "Wins"},
+                        "rows": [{"wins": 8}],
+                        "title": None,
+                    },
                 ),
             ),
         ),
@@ -70,7 +78,15 @@ def test_chat_returns_an_agent_response(monkeypatch) -> None:
                 "type": "markdown",
                 "payload": {"content": "Answer for: Show Tyler Tardi's Brier statistics."},
             },
-            {"type": "table", "payload": {"columns": ["wins"], "rows": [{"wins": 8}]}},
+            {
+                "type": "table",
+                "payload": {
+                    "columns": ["wins"],
+                    "column_labels": {"wins": "Wins"},
+                    "rows": [{"wins": 8}],
+                    "title": None,
+                },
+            },
         ],
     }
 
@@ -112,6 +128,24 @@ def test_chat_rejects_unknown_conversation(monkeypatch) -> None:
     assert response.json() == {"detail": "The requested conversation does not exist."}
 
 
+def test_chat_rejects_blank_or_oversized_messages() -> None:
+    blank_response = client.post("/api/chat", json={"message": " \n "})
+    oversized_response = client.post("/api/chat", json={"message": "x" * 2_001})
+
+    assert blank_response.status_code == 422
+    assert oversized_response.status_code == 422
+
+
+def test_artifact_boundary_rejects_a_table_without_display_labels() -> None:
+    with pytest.raises(ValidationError, match="column_labels"):
+        artifact_block(
+            {
+                "type": "table",
+                "payload": {"columns": ["wins"], "rows": [{"wins": 8}], "title": None},
+            }
+        )
+
+
 def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
     service = _install_conversation_service(monkeypatch)
     monkeypatch.setattr(
@@ -119,7 +153,18 @@ def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
         lambda *_: iter(
             [
                 AgentStreamEvent(type="markdown_delta", payload={"delta": "Here "}),
-                AgentStreamEvent(type="artifact", payload={"type": "table", "payload": {"rows": []}}),
+                AgentStreamEvent(
+                    type="artifact",
+                    payload={
+                        "type": "table",
+                        "payload": {
+                            "columns": ["wins"],
+                            "column_labels": {"wins": "Wins"},
+                            "rows": [],
+                            "title": None,
+                        },
+                    },
+                ),
                 AgentStreamEvent(type="complete"),
             ]
         ),
@@ -130,9 +175,10 @@ def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     assert response.text == (
-        f"event: message_start\ndata: {{\"conversation_id\": \"{service.metadata.id}\"}}\n\n"
-        "event: markdown_delta\ndata: {\"delta\": \"Here \"}\n\n"
-        "event: artifact\ndata: {\"type\": \"table\", \"payload\": {\"rows\": []}}\n\n"
+        f'event: message_start\ndata: {{"conversation_id": "{service.metadata.id}"}}\n\n'
+        'event: markdown_delta\ndata: {"delta": "Here "}\n\n'
+        'event: artifact\ndata: {"type": "table", "payload": {"columns": ["wins"], '
+        '"column_labels": {"wins": "Wins"}, "rows": [], "title": null}}\n\n'
         "event: complete\ndata: {}\n\n"
     )
     assert service.touched == [service.metadata.id]

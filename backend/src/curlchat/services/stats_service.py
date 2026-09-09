@@ -50,16 +50,12 @@ class StatsService:
         self._row_limit = row_limit
         self._statement_timeout_ms = statement_timeout_ms
 
-    def execute(
-        self, sql: str, parameters: dict[str, Any] | None = None
-    ) -> AnalyticsQueryResult:
+    def execute(self, sql: str, parameters: dict[str, Any] | None = None) -> AnalyticsQueryResult:
         """Execute one statement with bound parameters and bounded resource use."""
         try:
             validated_sql = self._single_statement_sql(sql)
         except QueryValidationError as error:
-            return AnalyticsQueryResult(
-                status=AnalyticsQueryStatus.UNSUPPORTED, message=str(error)
-            )
+            return AnalyticsQueryResult(status=AnalyticsQueryStatus.UNSUPPORTED, message=str(error))
 
         try:
             columns, rows, truncated = self._repository.execute(
@@ -69,6 +65,7 @@ class StatsService:
                 self._statement_timeout_ms,
             )
         except SQLAlchemyError as error:
+            self._repository.rollback()
             return AnalyticsQueryResult(
                 status=AnalyticsQueryStatus.EXECUTION_FAILURE,
                 message="The analytics query could not be executed.",
@@ -89,7 +86,9 @@ class StatsService:
         if not validated_sql:
             raise QueryValidationError("An analytics query is required.")
         if ";" in validated_sql:
-            raise QueryValidationError("Exactly one analytics query is allowed without a semicolon.")
+            raise QueryValidationError(
+                "Exactly one analytics query is allowed without a semicolon."
+            )
         return validated_sql
 
 

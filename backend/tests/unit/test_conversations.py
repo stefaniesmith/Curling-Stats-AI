@@ -67,7 +67,12 @@ def test_get_conversation_messages_returns_renderable_history(monkeypatch) -> No
                 artifacts=(
                     VisualizationArtifact(
                         type=VisualizationType.TABLE,
-                        payload={"columns": ["wins"], "rows": [{"wins": 8}]},
+                        payload={
+                            "columns": ["wins"],
+                            "column_labels": {"wins": "Wins"},
+                            "rows": [{"wins": 8}],
+                            "title": None,
+                        },
                     ),
                 ),
             ),
@@ -84,7 +89,15 @@ def test_get_conversation_messages_returns_renderable_history(monkeypatch) -> No
             "content": "Here are the results.",
             "blocks": [
                 {"type": "markdown", "payload": {"content": "Here are the results."}},
-                {"type": "table", "payload": {"columns": ["wins"], "rows": [{"wins": 8}]}},
+                {
+                    "type": "table",
+                    "payload": {
+                        "columns": ["wins"],
+                        "column_labels": {"wins": "Wins"},
+                        "rows": [{"wins": 8}],
+                        "title": None,
+                    },
+                },
             ],
         },
     ]

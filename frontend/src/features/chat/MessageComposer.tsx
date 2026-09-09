@@ -34,6 +34,7 @@ export function MessageComposer({ disabled, onSend }: MessageComposerProps) {
         onChange={(event) => setDraft(event.target.value)}
         placeholder="Ask about a player, event, season, or statistic…"
         rows={1}
+        maxLength={2_000}
         disabled={disabled}
         onKeyDown={handleKeyDown}
       />

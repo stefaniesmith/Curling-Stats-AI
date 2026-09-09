@@ -29,3 +29,7 @@ class AnalyticsRepository:
         )
         rows = tuple(dict(row) for row in result.mappings())
         return tuple(result.keys()), rows[:row_limit], len(rows) > row_limit
+
+    def rollback(self) -> None:
+        """Clear a failed transaction before a generated-query repair attempt."""
+        self._session.rollback()

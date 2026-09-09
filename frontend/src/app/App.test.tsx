@@ -60,6 +60,7 @@ describe("App", () => {
     render(<App />);
 
     const composer = await screen.findByPlaceholderText(/ask about a player/i);
+    expect(composer).toHaveAttribute("maxlength", "2000");
     await user.type(composer, "Show Brier results");
     await user.keyboard("{Enter}");
     await screen.findByText("Answer: Show Brier results");

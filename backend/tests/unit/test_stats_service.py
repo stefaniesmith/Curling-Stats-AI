@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from curlchat.db.models import Event, Player, PlayerEventStatistics
@@ -68,7 +69,9 @@ def test_returns_an_execution_failure_for_a_statement_the_database_rejects() -> 
 
 def test_accepts_one_trailing_semicolon() -> None:
     with _session_with_statistics() as session:
-        result = StatsService(AnalyticsRepository(session)).execute("SELECT display_name FROM players;")
+        result = StatsService(AnalyticsRepository(session)).execute(
+            "SELECT display_name FROM players;"
+        )
 
     assert result.status is AnalyticsQueryStatus.SUCCESS
     assert result.rows == ({"display_name": "Brad Gushue"},)
@@ -96,11 +99,33 @@ def test_rejects_multiple_statements() -> None:
 
 def test_returns_a_structured_execution_failure() -> None:
     with _session_with_statistics() as session:
-        result = StatsService(AnalyticsRepository(session)).execute("SELECT missing_column FROM players")
+        result = StatsService(AnalyticsRepository(session)).execute(
+            "SELECT missing_column FROM players"
+        )
 
     assert result.status is AnalyticsQueryStatus.EXECUTION_FAILURE
     assert result.message == "The analytics query could not be executed."
     assert result.repair_error == "no such column: missing_column"
+
+
+def test_rolls_back_after_a_database_error_before_a_repair_attempt() -> None:
+    class Repository:
+        rolled_back = False
+
+        def execute(
+            self, *_: object, **__: object
+        ) -> tuple[tuple[str, ...], tuple[dict[str, object], ...], bool]:
+            raise SQLAlchemyError("broken query")
+
+        def rollback(self) -> None:
+            self.rolled_back = True
+
+    repository = Repository()
+
+    result = StatsService(repository).execute("SELECT missing_column")  # type: ignore[arg-type]
+
+    assert result.status is AnalyticsQueryStatus.EXECUTION_FAILURE
+    assert repository.rolled_back
 
 
 def test_caps_result_rows() -> None:

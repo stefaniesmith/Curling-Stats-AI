@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from curlchat.agent.graph.app_graph import load_conversation_history
+from curlchat.api.schemas.chat import artifact_block, markdown_block
 from curlchat.api.schemas.conversations import ConversationMessageResponse, ConversationResponse
 from curlchat.db.session import StateSessionLocal
 from curlchat.services.conversation_service import ConversationNotFoundError, ConversationService
@@ -41,11 +42,8 @@ def get_conversation_messages(conversation_id: UUID) -> list[ConversationMessage
             role=message.role,
             content=message.content,
             blocks=(
-                [{"type": "markdown", "payload": {"content": message.content}}]
-                + [
-                    {"type": artifact.type, "payload": artifact.payload}
-                    for artifact in message.artifacts
-                ]
+                [markdown_block(message.content)]
+                + [artifact_block(artifact.model_dump()) for artifact in message.artifacts]
                 if message.role == "assistant"
                 else []
             ),
