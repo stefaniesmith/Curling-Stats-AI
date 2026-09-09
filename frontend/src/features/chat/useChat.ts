@@ -119,15 +119,21 @@ export function useChat() {
       setIsSending(true);
       const assistantMessageId = crypto.randomUUID();
       const pendingArtifacts: ArtifactBlock[] = [];
-      const appendAssistantBlock = (block: ResponseBlock) => {
+      const appendAssistantBlocks = (blocksToAppend: ResponseBlock[]) => {
+        if (blocksToAppend.length === 0) return;
         if (version !== viewVersion.current) return;
         setMessages((current) => {
           const assistantIndex = current.findIndex((item) => item.id === assistantMessageId);
           if (assistantIndex === -1) {
-            return [...current, { id: assistantMessageId, role: "assistant", blocks: [block] }];
+            return [
+              ...current,
+              { id: assistantMessageId, role: "assistant", blocks: blocksToAppend },
+            ];
           }
           return current.map((item, index) =>
-            index === assistantIndex ? { ...item, blocks: [...(item.blocks ?? []), block] } : item,
+            index === assistantIndex
+              ? { ...item, blocks: [...(item.blocks ?? []), ...blocksToAppend] }
+              : item,
           );
         });
       };
@@ -173,7 +179,7 @@ export function useChat() {
             } else if (event.type === "artifact") {
               pendingArtifacts.push(event.payload);
             } else if (event.type === "complete") {
-              pendingArtifacts.forEach(appendAssistantBlock);
+              appendAssistantBlocks(pendingArtifacts);
             }
           },
           controller.signal,

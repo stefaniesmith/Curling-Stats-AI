@@ -182,3 +182,37 @@ def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
         "event: complete\ndata: {}\n\n"
     )
     assert service.touched == [service.metadata.id]
+
+
+def test_streaming_chat_omits_unused_chart_fields(monkeypatch) -> None:
+    _install_conversation_service(monkeypatch)
+    monkeypatch.setattr(
+        "curlchat.api.routes.chat.stream_response",
+        lambda *_: iter(
+            [
+                AgentStreamEvent(
+                    type="artifact",
+                    payload={
+                        "type": "chart",
+                        "payload": {
+                            "chart_type": "bar",
+                            "x_column": "display_name",
+                            "y_column": "wins",
+                            "x_label": "Player",
+                            "y_label": "Wins",
+                            "title": "Brier wins",
+                            "points": [{"x": "Taylor", "y": 8}],
+                        },
+                    },
+                ),
+                AgentStreamEvent(type="complete"),
+            ]
+        ),
+    )
+
+    response = client.post("/api/chat/stream", json={"message": "Chart Brier wins"})
+
+    assert response.status_code == 200
+    assert '"points": [{"x": "Taylor", "y": 8.0}]' in response.text
+    assert '"series": null' not in response.text
+    assert '"series_column": null' not in response.text

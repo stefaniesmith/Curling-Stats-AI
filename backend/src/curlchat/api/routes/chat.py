@@ -11,7 +11,13 @@ from curlchat.agent.graph.app_graph import (
     stream_response,
 )
 from curlchat.api.routes.conversations import get_conversation_service
-from curlchat.api.schemas.chat import ChatRequest, ChatResponse, artifact_block, markdown_block
+from curlchat.api.schemas.chat import (
+    ChartBlock,
+    ChatRequest,
+    ChatResponse,
+    artifact_block,
+    markdown_block,
+)
 from curlchat.services.conversation_service import ConversationNotFoundError
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -74,7 +80,7 @@ def stream_chat_response(request: ChatRequest) -> StreamingResponse:
         try:
             for event in stream_response(request.message, conversation.id):
                 payload = (
-                    artifact_block(event.payload).model_dump(mode="json")
+                    _stream_artifact_payload(event.payload)
                     if event.type == "artifact"
                     else event.payload
                 )
@@ -97,3 +103,14 @@ def stream_chat_response(request: ChatRequest) -> StreamingResponse:
 def _sse_event(event: str, payload: dict) -> str:
     """Serialize one small, trusted server-sent event."""
     return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
+def _stream_artifact_payload(value: object) -> dict:
+    """Serialize artifacts using the frontend's optional-field convention."""
+    artifact = artifact_block(value)
+    if isinstance(artifact, ChartBlock):
+        payload = artifact.payload.model_dump(mode="json", exclude_none=True)
+        # A title is required by the response contract, even when the chart has none.
+        payload["title"] = artifact.payload.title
+        return {"type": artifact.type, "payload": payload}
+    return artifact.model_dump(mode="json")
