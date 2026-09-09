@@ -19,4 +19,4 @@ Run `pnpm lint` for TypeScript and React linting, `pnpm format:check` to verify
 Prettier formatting, or `pnpm check` to run linting, formatting, tests, and a
 production build together. Use `pnpm format` to apply the configured formatting.
 
-See `docs/08-frontend.md` for the UI architecture and current conversation-history limitation.
+See [the frontend architecture document](../docs/08-frontend.md) for the UI design and boundaries.

@@ -15,10 +15,11 @@ The frontend uses Vitest, jsdom, and React Testing Library. Plotly is mocked at 
 Initial coverage verifies:
 
 * first-message creation and follow-up conversation IDs
-* sidebar history hydration and API-error feedback
+* sidebar history hydration, mobile-drawer interactions, and API-error feedback
+* cancellation and stale-response protection when conversations change
 * Markdown, summary, and table artifact rendering
 * typed HTTP and SSE artifact-contract validation
-* multi-series chart colors, title wrapping, and legend spacing
+* multi-series chart colors, title wrapping, legend spacing, and lazy loading
 * streaming conversation IDs, deterministic progress statuses, and final Markdown event handling
 
 Run frontend tests with `pnpm test` and create a production bundle with `pnpm build`.
