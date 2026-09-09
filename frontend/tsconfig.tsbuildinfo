@@ -1,1 +1,0 @@
-{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/app/app.test.tsx","./src/app/app.tsx","./src/features/visualizations/responseblocks.test.tsx","./src/features/visualizations/responseblocks.tsx","./src/lib/api.ts","./src/test/setup.ts","./src/types/api.test.ts","./src/types/api.ts","./src/types/react-plotly.d.ts"],"version":"5.6.3"}
