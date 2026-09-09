@@ -1,13 +1,32 @@
+import { useEffect } from "react";
+
 import { MessageComposer } from "../features/chat/MessageComposer";
 import { ChatTranscript } from "../features/chat/ChatTranscript";
 import { useChat } from "../features/chat/useChat";
 import { ConversationSidebar } from "../features/conversations/ConversationSidebar";
+import { preloadPlotly } from "../features/visualizations/plotly";
+
+type IdleWindow = Window & {
+  cancelIdleCallback?: (id: number) => void;
+  requestIdleCallback?: (callback: () => void) => number;
+};
 
 export function App() {
   const chat = useChat();
   const activeTitle = chat.conversations.find(
     (conversation) => conversation.id === chat.activeConversationId,
   )?.title;
+
+  useEffect(() => {
+    const browserWindow = window as IdleWindow;
+    if (browserWindow.requestIdleCallback) {
+      const callbackId = browserWindow.requestIdleCallback(preloadPlotly);
+      return () => browserWindow.cancelIdleCallback?.(callbackId);
+    }
+
+    const timeoutId = window.setTimeout(preloadPlotly, 1_500);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   return (
     <main className="app-shell">

@@ -1,4 +1,4 @@
-import Plot from "react-plotly.js";
+import { lazy, Suspense } from "react";
 import ReactMarkdown from "react-markdown";
 
 import type {
@@ -7,8 +7,10 @@ import type {
   TableBlock as TableResponseBlock,
   ResponseBlock,
 } from "../../types/api";
+import { loadPlotly } from "./plotly";
 
 const seriesColors = ["#c7192d", "#087e8b", "#315e9e", "#d97b29", "#7552a1"];
+const Plot = lazy(loadPlotly);
 
 function wrapChartTitle(title: string, maxCharacters = 72) {
   const lines: string[] = [];
@@ -99,48 +101,50 @@ function ChartBlock({ payload }: ChartResponseBlock) {
 
   return (
     <section className="artifact chart-card">
-      <Plot
-        data={datasets.map((dataset, index) => {
-          const color = seriesColors[index % seriesColors.length];
-          return {
-            ...dataset,
-            type: chartType,
-            mode: chartType === "scatter" ? mode : undefined,
-            marker: { color },
-            line: { color, width: 3 },
-            hovertemplate: "%{x}<br><b>%{y}</b><extra></extra>",
-          };
-        })}
-        layout={{
-          title: title ? { text: wrapChartTitle(title), x: 0.5, xanchor: "center" } : undefined,
-          autosize: true,
-          height: 330,
-          margin: {
-            l: 48,
-            r: 24,
-            t: title ? 35 + titleLines * 20 : 24,
-            b: hasLegend ? 120 : 64,
-          },
-          paper_bgcolor: "rgba(0,0,0,0)",
-          plot_bgcolor: "rgba(234,244,251,0.6)",
-          font: { family: "Inter, system-ui, sans-serif", color: "#19325d" },
-          xaxis: {
-            title: { text: payload.x_label, standoff: 18 },
-            gridcolor: "rgba(7,31,79,.08)",
-          },
-          yaxis: {
-            title: payload.y_label,
-            gridcolor: "rgba(7,31,79,.1)",
-            zerolinecolor: "rgba(7,31,79,.2)",
-          },
-          barmode: payload.bar_mode === "group" ? "group" : undefined,
-          showlegend: hasLegend,
-          legend: { orientation: "h", x: 0, xanchor: "left", y: -0.46, yanchor: "top" },
-        }}
-        config={{ displayModeBar: false, responsive: true }}
-        className="plot"
-        useResizeHandler
-      />
+      <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>
+        <Plot
+          data={datasets.map((dataset, index) => {
+            const color = seriesColors[index % seriesColors.length];
+            return {
+              ...dataset,
+              type: chartType,
+              mode: chartType === "scatter" ? mode : undefined,
+              marker: { color },
+              line: { color, width: 3 },
+              hovertemplate: "%{x}<br><b>%{y}</b><extra></extra>",
+            };
+          })}
+          layout={{
+            title: title ? { text: wrapChartTitle(title), x: 0.5, xanchor: "center" } : undefined,
+            autosize: true,
+            height: 330,
+            margin: {
+              l: 48,
+              r: 24,
+              t: title ? 35 + titleLines * 20 : 24,
+              b: hasLegend ? 120 : 64,
+            },
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(234,244,251,0.6)",
+            font: { family: "Inter, system-ui, sans-serif", color: "#19325d" },
+            xaxis: {
+              title: { text: payload.x_label, standoff: 18 },
+              gridcolor: "rgba(7,31,79,.08)",
+            },
+            yaxis: {
+              title: payload.y_label,
+              gridcolor: "rgba(7,31,79,.1)",
+              zerolinecolor: "rgba(7,31,79,.2)",
+            },
+            barmode: payload.bar_mode === "group" ? "group" : undefined,
+            showlegend: hasLegend,
+            legend: { orientation: "h", x: 0, xanchor: "left", y: -0.46, yanchor: "top" },
+          }}
+          config={{ displayModeBar: false, responsive: true }}
+          className="plot"
+          useResizeHandler
+        />
+      </Suspense>
     </section>
   );
 }

@@ -394,6 +394,15 @@ td {
 .plot {
   width: 100%;
 }
+.chart-loading {
+  display: grid;
+  min-height: 330px;
+  place-items: center;
+  color: #6581a3;
+  background: rgba(234, 244, 251, 0.6);
+  font-size: 13px;
+  font-weight: 650;
+}
 .thinking .message-card {
   display: flex;
   align-items: center;

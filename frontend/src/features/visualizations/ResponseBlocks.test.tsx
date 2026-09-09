@@ -38,7 +38,7 @@ describe("ResponseBlocks", () => {
     expect(screen.getByText("Brad Jacobs")).toBeInTheDocument();
   });
 
-  it("gives series distinct colors and reserves room for a wrapped title and legend", () => {
+  it("gives series distinct colors and reserves room for a wrapped title and legend", async () => {
     const longTitle =
       "A long comparison of draw percentages across multiple Curling Canada championship seasons";
     render(
@@ -63,7 +63,7 @@ describe("ResponseBlocks", () => {
       />,
     );
 
-    const plot = screen.getByTestId("plot");
+    const plot = await screen.findByTestId("plot");
     expect(plot).toHaveAttribute("data-colors", "#c7192d,#087e8b");
     expect(plot.getAttribute("data-layout")).toContain("<br>");
     expect(plot.getAttribute("data-layout")).toContain('"b":120');
@@ -104,7 +104,7 @@ describe("ResponseBlocks", () => {
     expect(screen.queryByText("71.0000000000000000")).not.toBeInTheDocument();
   });
 
-  it("uses display labels supplied by new visualization artifacts", () => {
+  it("uses display labels supplied by new visualization artifacts", async () => {
     render(
       <ResponseBlocks
         blocks={[
@@ -134,7 +134,7 @@ describe("ResponseBlocks", () => {
     );
 
     expect(screen.getByRole("columnheader", { name: "Draw Percentage" })).toBeInTheDocument();
-    const latestPlot = screen.getAllByTestId("plot").at(-1);
+    const latestPlot = (await screen.findAllByTestId("plot")).at(-1);
     expect(latestPlot?.getAttribute("data-layout")).toContain('"text":"Season"');
     expect(latestPlot?.getAttribute("data-layout")).toContain('"title":"Draw Percentage"');
   });

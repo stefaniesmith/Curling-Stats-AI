@@ -49,7 +49,11 @@ The UI treats `blocks` from the chat response as the rendering contract. Support
 * `chart` with `bar`, `line`, or `dot` points or named series, plus backend-provided
   `x_label` and `y_label`
 
-Charts are rendered by Plotly in the browser. The backend Visualization Service remains the authority for chart types, mappings, payload construction, and display labels.
+Charts are rendered by Plotly in the browser. Plotly is loaded as a separate
+browser chunk when a chart is rendered and prefetched during idle time; an
+inline loading state reserves chart space if that first load is still pending.
+The backend Visualization Service remains the authority for chart types,
+mappings, payload construction, and display labels.
 The frontend validates the API and SSE artifact payloads at its boundary using
 discriminated TypeScript contracts. Invalid payloads are treated as API failures
 rather than being rendered through unchecked casts.
