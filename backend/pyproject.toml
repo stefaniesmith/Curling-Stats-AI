@@ -24,6 +24,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "httpx>=0.28.0",
+  "polyfactory>=2.22.3",
   "pytest>=8.4.0",
   "pytest-asyncio>=1.1.0",
   "ruff>=0.12.0",

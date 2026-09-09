@@ -1,10 +1,8 @@
 from fastapi.testclient import TestClient
 
-from curlchat.main import app
 
-
-def test_healthcheck() -> None:
-    client = TestClient(app)
+def test_healthcheck(api_client: TestClient) -> None:
+    client = api_client
 
     response = client.get("/health")
 

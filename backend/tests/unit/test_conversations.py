@@ -1,21 +1,20 @@
-from uuid import uuid4
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
 from curlchat.agent.graph.app_graph import ConversationHistoryMessage
-from curlchat.main import app
 from curlchat.services.conversation_service import ConversationMetadata
-from curlchat.services.visualization_service import VisualizationArtifact, VisualizationType
+from curlchat.services.visualization_service import VisualizationType
+from tests.factories import ConversationMetadataFactory, VisualizationArtifactFactory
 
-client = TestClient(app)
 
-
-def test_list_conversations_serializes_service_metadata(monkeypatch) -> None:
-    metadata = ConversationMetadata(
-        id=uuid4(),
+def test_list_conversations_serializes_service_metadata(
+    monkeypatch, api_client: TestClient
+) -> None:
+    metadata = ConversationMetadataFactory.build(
         title="Brad Jacobs Brier statistics",
-        created_at="2026-09-06T00:00:00Z",
-        updated_at="2026-09-06T12:00:00Z",
+        created_at=datetime(2026, 9, 6, tzinfo=UTC),
+        updated_at=datetime(2026, 9, 6, 12, tzinfo=UTC),
     )
 
     class FakeConversationService:
@@ -27,7 +26,7 @@ def test_list_conversations_serializes_service_metadata(monkeypatch) -> None:
         lambda: FakeConversationService(),
     )
 
-    response = client.get("/api/conversations")
+    response = api_client.get("/api/conversations")
 
     assert response.status_code == 200
     assert response.json() == [
@@ -40,12 +39,13 @@ def test_list_conversations_serializes_service_metadata(monkeypatch) -> None:
     ]
 
 
-def test_get_conversation_messages_returns_renderable_history(monkeypatch) -> None:
-    metadata = ConversationMetadata(
-        id=uuid4(),
+def test_get_conversation_messages_returns_renderable_history(
+    monkeypatch, api_client: TestClient
+) -> None:
+    metadata = ConversationMetadataFactory.build(
         title="Brad Jacobs Brier statistics",
-        created_at="2026-09-06T00:00:00Z",
-        updated_at="2026-09-06T12:00:00Z",
+        created_at=datetime(2026, 9, 6, tzinfo=UTC),
+        updated_at=datetime(2026, 9, 6, 12, tzinfo=UTC),
     )
 
     class FakeConversationService:
@@ -65,7 +65,7 @@ def test_get_conversation_messages_returns_renderable_history(monkeypatch) -> No
                 role="assistant",
                 content="Here are the results.",
                 artifacts=(
-                    VisualizationArtifact(
+                    VisualizationArtifactFactory.build(
                         type=VisualizationType.TABLE,
                         payload={
                             "columns": ["wins"],
@@ -79,7 +79,7 @@ def test_get_conversation_messages_returns_renderable_history(monkeypatch) -> No
         ),
     )
 
-    response = client.get(f"/api/conversations/{metadata.id}/messages")
+    response = api_client.get(f"/api/conversations/{metadata.id}/messages")
 
     assert response.status_code == 200
     assert response.json() == [

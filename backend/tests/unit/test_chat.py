@@ -11,20 +11,15 @@ from curlchat.agent.graph.app_graph import (
     AgentStreamEvent,
 )
 from curlchat.api.schemas.chat import artifact_block
-from curlchat.main import app
 from curlchat.services.conversation_service import ConversationMetadata, ConversationNotFoundError
-from curlchat.services.visualization_service import VisualizationArtifact, VisualizationType
-
-client = TestClient(app)
+from curlchat.services.visualization_service import VisualizationType
+from tests.factories import ConversationMetadataFactory, VisualizationArtifactFactory
 
 
 class FakeConversationService:
     def __init__(self) -> None:
-        self.metadata = ConversationMetadata(
-            id=uuid4(),
+        self.metadata = ConversationMetadataFactory.build(
             title="Test conversation",
-            created_at="2026-09-06T00:00:00Z",
-            updated_at="2026-09-06T00:00:00Z",
         )
         self.touched: list[object] = []
 
@@ -47,14 +42,14 @@ def _install_conversation_service(monkeypatch) -> FakeConversationService:
     return service
 
 
-def test_chat_returns_an_agent_response(monkeypatch) -> None:
+def test_chat_returns_an_agent_response(monkeypatch, api_client: TestClient) -> None:
     service = _install_conversation_service(monkeypatch)
     monkeypatch.setattr(
         "curlchat.api.routes.chat.respond_to_message",
         lambda message, conversation_id: AgentResponse(
             message=f"Answer for: {message}",
             artifacts=(
-                VisualizationArtifact(
+                VisualizationArtifactFactory.build(
                     type=VisualizationType.TABLE,
                     payload={
                         "columns": ["wins"],
@@ -67,7 +62,9 @@ def test_chat_returns_an_agent_response(monkeypatch) -> None:
         ),
     )
 
-    response = client.post("/api/chat", json={"message": "Show Tyler Tardi's Brier statistics."})
+    response = api_client.post(
+        "/api/chat", json={"message": "Show Tyler Tardi's Brier statistics."}
+    )
 
     assert response.status_code == 200
     assert response.json() == {
@@ -91,49 +88,46 @@ def test_chat_returns_an_agent_response(monkeypatch) -> None:
     }
 
 
-def test_chat_reports_missing_agent_configuration(monkeypatch) -> None:
-    _install_conversation_service(monkeypatch)
-
-    def missing_configuration(_: str, __: object) -> str:
-        raise AgentConfigurationError("OPENAI_API_KEY is not configured.")
-
-    monkeypatch.setattr("curlchat.api.routes.chat.respond_to_message", missing_configuration)
-
-    response = client.post("/api/chat", json={"message": "Hello"})
-
-    assert response.status_code == 503
-    assert response.json() == {"detail": "The chat service is not configured."}
-
-
-def test_chat_reports_model_provider_failure(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("agent_error", "expected_detail"),
+    [
+        (AgentConfigurationError, "The chat service is not configured."),
+        (AgentInvocationError, "The chat service is temporarily unavailable."),
+    ],
+    ids=["missing-configuration", "provider-failure"],
+)
+def test_chat_hides_agent_errors(
+    monkeypatch, api_client: TestClient, agent_error: type[Exception], expected_detail: str
+) -> None:
     _install_conversation_service(monkeypatch)
 
     def unavailable(_: str, __: object) -> str:
-        raise AgentInvocationError("The model provider could not complete the request.")
+        raise agent_error("internal details")
 
     monkeypatch.setattr("curlchat.api.routes.chat.respond_to_message", unavailable)
 
-    response = client.post("/api/chat", json={"message": "Hello"})
+    response = api_client.post("/api/chat", json={"message": "Hello"})
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "The chat service is temporarily unavailable."}
+    assert response.json() == {"detail": expected_detail}
 
 
-def test_chat_rejects_unknown_conversation(monkeypatch) -> None:
+def test_chat_rejects_unknown_conversation(monkeypatch, api_client: TestClient) -> None:
     _install_conversation_service(monkeypatch)
 
-    response = client.post("/api/chat", json={"message": "Hello", "conversation_id": str(uuid4())})
+    response = api_client.post(
+        "/api/chat", json={"message": "Hello", "conversation_id": str(uuid4())}
+    )
 
     assert response.status_code == 404
     assert response.json() == {"detail": "The requested conversation does not exist."}
 
 
-def test_chat_rejects_blank_or_oversized_messages() -> None:
-    blank_response = client.post("/api/chat", json={"message": " \n "})
-    oversized_response = client.post("/api/chat", json={"message": "x" * 2_001})
+@pytest.mark.parametrize("message", [" \n ", "x" * 2_001], ids=["blank", "oversized"])
+def test_chat_rejects_invalid_messages(api_client: TestClient, message: str) -> None:
+    response = api_client.post("/api/chat", json={"message": message})
 
-    assert blank_response.status_code == 422
-    assert oversized_response.status_code == 422
+    assert response.status_code == 422
 
 
 def test_artifact_boundary_rejects_a_table_without_display_labels() -> None:
@@ -146,7 +140,7 @@ def test_artifact_boundary_rejects_a_table_without_display_labels() -> None:
         )
 
 
-def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
+def test_streaming_chat_returns_ordered_sse_events(monkeypatch, api_client: TestClient) -> None:
     service = _install_conversation_service(monkeypatch)
     monkeypatch.setattr(
         "curlchat.api.routes.chat.stream_response",
@@ -170,7 +164,7 @@ def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
         ),
     )
 
-    response = client.post("/api/chat/stream", json={"message": "Show stats"})
+    response = api_client.post("/api/chat/stream", json={"message": "Show stats"})
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
@@ -184,7 +178,7 @@ def test_streaming_chat_returns_ordered_sse_events(monkeypatch) -> None:
     assert service.touched == [service.metadata.id]
 
 
-def test_streaming_chat_omits_unused_chart_fields(monkeypatch) -> None:
+def test_streaming_chat_omits_unused_chart_fields(monkeypatch, api_client: TestClient) -> None:
     _install_conversation_service(monkeypatch)
     monkeypatch.setattr(
         "curlchat.api.routes.chat.stream_response",
@@ -210,7 +204,7 @@ def test_streaming_chat_omits_unused_chart_fields(monkeypatch) -> None:
         ),
     )
 
-    response = client.post("/api/chat/stream", json={"message": "Chart Brier wins"})
+    response = api_client.post("/api/chat/stream", json={"message": "Chart Brier wins"})
 
     assert response.status_code == 200
     assert '"points": [{"x": "Taylor", "y": 8.0}]' in response.text

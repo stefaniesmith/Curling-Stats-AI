@@ -1,11 +1,10 @@
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from curlchat.db.models import Event, Player, PlayerAlias, PlayerEventStatistics
-from curlchat.db.session import Base
 from curlchat.ingest.archive import import_archive, load_archive, normalize_name
 
 
@@ -142,7 +141,9 @@ years: []
         load_archive(tmp_path)
 
 
-def test_import_archive_upserts_yearly_statistics_and_aliases(tmp_path: Path) -> None:
+def test_import_archive_upserts_yearly_statistics_and_aliases(
+    tmp_path: Path, sqlite_engine
+) -> None:
     _write_archive_file(tmp_path, "hearts", "mallett-marla.md", _canonical_player_document())
     _write_archive_file(
         tmp_path,
@@ -150,10 +151,7 @@ def test_import_archive_upserts_yearly_statistics_and_aliases(tmp_path: Path) ->
         "geiger-marla.md",
         "---\nname: Marla Geiger\nname-sort: Geiger, Marla\naka: Mallett, Marla\n---\n",
     )
-    engine = create_engine("sqlite://")
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(sqlite_engine) as session:
         report = import_archive(session, tmp_path)
         session.commit()
         repeat_report = import_archive(session, tmp_path)
@@ -173,7 +171,9 @@ def test_import_archive_upserts_yearly_statistics_and_aliases(tmp_path: Path) ->
     assert statistic.shots_percent == 78
 
 
-def test_import_archive_merges_source_names_that_only_differ_by_case(tmp_path: Path) -> None:
+def test_import_archive_merges_source_names_that_only_differ_by_case(
+    tmp_path: Path, sqlite_engine
+) -> None:
     _write_archive_file(
         tmp_path,
         "brier",
@@ -191,10 +191,7 @@ def test_import_archive_merges_source_names_that_only_differ_by_case(tmp_path: P
         .replace("Mallett, Marla", "Macdonald, Frank")
         .replace("1995", "1961"),
     )
-    engine = create_engine("sqlite://")
-    Base.metadata.create_all(engine)
-
-    with Session(engine) as session:
+    with Session(sqlite_engine) as session:
         report = import_archive(session, tmp_path)
         session.commit()
         players = list(session.scalars(select(Player)))
@@ -236,6 +233,6 @@ def test_load_archive_skips_conflicting_aliases(tmp_path: Path) -> None:
     )
 
 
-def test_normalize_name_uses_one_lookup_form_for_display_and_sort_names() -> None:
-    assert normalize_name("Mallett, Marla") == "marla mallett"
-    assert normalize_name("Marla Mallett") == "marla mallett"
+@pytest.mark.parametrize("name", ["Mallett, Marla", "Marla Mallett"])
+def test_normalize_name_uses_one_lookup_form_for_display_and_sort_names(name: str) -> None:
+    assert normalize_name(name) == "marla mallett"
