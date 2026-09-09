@@ -101,6 +101,10 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     assert "Never generate, request, expose, or explain SQL" in system_prompt
     assert "Hearts | 1982–2025 | Available" in system_prompt
     assert "no matching imported records were found" in system_prompt
+    assert "analyst of Curling Canada player statistics" in system_prompt
+    assert "lead comparisons with the main conclusion" in system_prompt
+    assert "Compare like-for-like years" in system_prompt
+    assert "Avoid generic filler" in system_prompt
     assert "has_any_records_for_resolved_players: false" in system_prompt
     assert "do not ask the user whether they want one" in system_prompt
     assert "Always create one for an explicit request to" in system_prompt

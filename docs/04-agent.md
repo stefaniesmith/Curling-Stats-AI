@@ -63,6 +63,12 @@ or many categories matter, and answers a single winner or scalar result in
 prose unless the user explicitly requests a table or chart.
 When it includes an artifact, the written response states the takeaway directly
 rather than announcing or describing the chart or table renderer.
+Its response guidance frames CurlChat as an analyst of player statistics: it
+leads comparisons with the main conclusion, supports that conclusion with the
+relevant figures and period, and uses measured curling-specific interpretation
+only when the data supports it. Comparisons identify material missing years or
+appearances and use like-for-like years for head-to-head claims; unsupported
+causal explanations and generic follow-up filler are avoided.
 
 Conversation persistence is implemented with LangGraph's PostgreSQL
 checkpointer. Every chat request supplies the application's UUID as the
