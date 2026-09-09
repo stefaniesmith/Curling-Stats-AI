@@ -42,6 +42,11 @@ button {
   background: #071f4f;
   color: white;
 }
+.sidebar-close,
+.mobile-menu,
+.sidebar-backdrop {
+  display: none;
+}
 .brand-row {
   display: flex;
   align-items: center;
@@ -165,6 +170,11 @@ button {
   align-items: center;
   padding: 25px 42px 20px;
   border-bottom: 1px solid #e4ebef;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 .chat-header p,
 .eyebrow {
@@ -504,22 +514,88 @@ td {
 }
 @media (max-width: 760px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    display: block;
   }
   .sidebar {
-    display: none;
+    position: fixed;
+    z-index: 20;
+    width: min(86vw, 320px);
+    min-height: 100dvh;
+    height: 100dvh;
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
+    box-shadow: 12px 0 30px rgba(2, 15, 42, 0.25);
+    transition:
+      transform 0.2s ease,
+      visibility 0s linear 0.2s;
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 0.2s ease;
+  }
+  .sidebar-close {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    margin-left: auto;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.13);
+    color: white;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    z-index: 10;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    visibility: hidden;
+    pointer-events: none;
+    background: rgba(2, 15, 42, 0.42);
+    opacity: 0;
+    transition:
+      opacity 0.2s ease,
+      visibility 0s linear 0.2s;
+  }
+  .sidebar-backdrop.sidebar-backdrop-open {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    transition: opacity 0.2s ease;
   }
   .chat-panel {
     height: 100dvh;
   }
   .chat-header {
-    padding: 18px 20px;
+    padding: 14px 18px;
   }
   .chat-header p {
     font-size: 9px;
   }
   .status-dot {
     font-size: 10px;
+  }
+  .header-actions {
+    gap: 10px;
+  }
+  .mobile-menu {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border: 1px solid #aec8d7;
+    border-radius: 9px;
+    background: #fff;
+    color: #071f4f;
+    font-size: 20px;
+    line-height: 1;
   }
   .messages {
     padding: 23px 18px;

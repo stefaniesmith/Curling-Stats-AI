@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MessageComposer } from "../features/chat/MessageComposer";
 import { ChatTranscript } from "../features/chat/ChatTranscript";
@@ -13,6 +13,8 @@ type IdleWindow = Window & {
 
 export function App() {
   const chat = useChat();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const activeTitle = chat.conversations.find(
     (conversation) => conversation.id === chat.activeConversationId,
   )?.title;
@@ -28,15 +30,43 @@ export function App() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+    if (isSidebarOpen) menuButton.current?.focus();
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSidebar();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [closeSidebar, isSidebarOpen]);
+
   return (
     <main className="app-shell">
+      <button
+        aria-label="Close conversations"
+        className={isSidebarOpen ? "sidebar-backdrop sidebar-backdrop-open" : "sidebar-backdrop"}
+        onClick={closeSidebar}
+        tabIndex={isSidebarOpen ? 0 : -1}
+      />
       <ConversationSidebar
         activeConversationId={chat.activeConversationId}
         conversations={chat.conversations}
         isLoading={chat.isLoadingConversations}
-        onNewConversation={chat.newConversation}
+        isOpen={isSidebarOpen}
+        onClose={closeSidebar}
+        onNewConversation={() => {
+          chat.newConversation();
+          closeSidebar();
+        }}
         onRefresh={() => void chat.refreshConversations()}
-        onSelectConversation={(id) => void chat.selectConversation(id)}
+        onSelectConversation={(id) => {
+          void chat.selectConversation(id);
+          closeSidebar();
+        }}
       />
 
       <section className="chat-panel">
@@ -45,7 +75,19 @@ export function App() {
             <p>CONVERSATIONAL ANALYTICS</p>
             <h1>{activeTitle ?? "New conversation"}</h1>
           </div>
-          <span className="status-dot">Archive connected</span>
+          <div className="header-actions">
+            <span className="status-dot">Archive connected</span>
+            <button
+              aria-controls="conversation-sidebar"
+              aria-expanded={isSidebarOpen}
+              aria-label="Open conversations"
+              className="mobile-menu"
+              onClick={() => setIsSidebarOpen(true)}
+              ref={menuButton}
+            >
+              ☰
+            </button>
+          </div>
         </header>
         <ChatTranscript
           activity={chat.activity}

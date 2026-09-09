@@ -38,6 +38,10 @@ Changing or starting a conversation cancels any in-flight history load or chat
 stream. A view-version guard also discards stale responses that arrive after a
 new selection, so an older request cannot replace the active transcript.
 
+On narrow viewports, the conversation sidebar becomes an overlay drawer. The
+menu button exposes its expanded state, the drawer can be dismissed through its
+close control, backdrop, or Escape, and selection returns focus to the menu.
+
 ## Response Blocks
 
 The UI treats `blocks` from the chat response as the rendering contract. Supported blocks are:

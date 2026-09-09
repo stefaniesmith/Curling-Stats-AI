@@ -269,6 +269,25 @@ describe("App", () => {
     expect(screen.getByPlaceholderText(/ask about a player/i)).toHaveValue("");
   });
 
+  it("opens and closes the conversation drawer with the menu and Escape key", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse([]));
+    const user = userEvent.setup();
+    render(<App />);
+
+    const menu = screen.getByRole("button", { name: "Open conversations" });
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(menu);
+    expect(menu).toHaveAttribute("aria-expanded", "true");
+    expect(document.querySelector(".sidebar")).toHaveClass("sidebar-open");
+    expect(document.querySelector<HTMLButtonElement>(".sidebar-close")).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(document.querySelector(".sidebar")).not.toHaveClass("sidebar-open");
+    expect(menu).toHaveFocus();
+  });
+
   it("shows a readable API error when the conversation list cannot load", async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse({ detail: "The state database is unavailable." }, 503),
