@@ -2,7 +2,24 @@
 
 <img src="assets/CurlChatLogo.png" alt="CurlChat logo" width="260" />
 
-CurlChat is a conversational analytics application for exploring Curling Canada player statistics. It combines a FastAPI backend, PostgreSQL analytics data, LangGraph agent orchestration, and a React interface with interactive visualizations.
+CurlChat lets users explore Curling Canada player statistics through natural-language questions, source-grounded answers, and interactive visualizations.
+
+## Highlights
+
+- Conversational analysis over structured PostgreSQL data
+- LangGraph orchestration with deterministic tools and services
+- Streaming FastAPI responses with interactive Plotly charts
+- Persistent multi-turn conversations
+
+## From question to insight
+
+Start a new conversation with a natural-language question, or choose a suggested prompt.
+
+<img src="assets/new_conversation_screenshot.png" alt="CurlChat new conversation screen with recent conversations and suggested questions" width="1000" />
+
+CurlChat compares player performance using source-grounded statistics and an interactive trend chart.
+
+<img src="assets/player_comparison_screenshot.png" alt="CurlChat response comparing Brad Jacobs and Brad Gushue at the Brier from 2020 through 2026" width="1000" />
 
 ## Run it locally with Docker
 
