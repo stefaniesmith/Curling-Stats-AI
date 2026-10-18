@@ -23,3 +23,11 @@ Initial coverage verifies:
 * streaming conversation IDs, deterministic progress statuses, and final Markdown event handling
 
 Run frontend tests with `pnpm test` and create a production bundle with `pnpm build`.
+
+## Continuous Integration
+
+GitHub Actions runs the backend and frontend quality checks for pull requests
+targeting `main` and for pushes to `main`. The workflow uses the committed
+dependency lockfiles, runs backend Ruff and pytest checks, and runs the
+frontend's `pnpm check` command. It does not require a live OpenAI provider,
+archive import, or Docker Compose services.
