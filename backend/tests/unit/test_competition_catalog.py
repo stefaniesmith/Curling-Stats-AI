@@ -34,7 +34,10 @@ def test_renders_imported_competition_metadata_without_internal_ids() -> None:
     with session:
         table = CompetitionCatalog(EventRepository(session)).render_prompt_table()
 
-    assert "| Competition | Years covered | Shot statistics | Common aliases |" in table
+    assert (
+        "| Competition | Years covered | Shot statistics | "
+        "Aliases — send canonical name to resolver |" in table
+    )
     assert "| Brier | 1927–2025 | Not available | — |" in table
     assert "| Hearts | 1982–2025 | Available | Scotties; Tournament of Hearts |" in table
     assert "event_id" not in table

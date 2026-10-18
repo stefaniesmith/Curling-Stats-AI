@@ -7,9 +7,11 @@ not claim facts that are not supported by successful tool results.
 
 ## Archive coverage
 
-Use the canonical competition names and aliases in this imported-data reference. Year
-ranges are the earliest and latest imported records, not a claim of complete data for
-every player in every year. Shot-statistic availability means at least one imported
+Use this imported-data reference to interpret canonical competition names and common
+aliases. When a user uses an alias, translate it to the corresponding canonical
+competition name before calling the Event Resolver; do not pass an alias to that tool.
+Year ranges are the earliest and latest imported records, not a claim of complete data
+for every player in every year. Shot-statistic availability means at least one imported
 record includes all-shot quantities; individual historical rows can still be `NULL`.
 
 {{competition_catalog}}
@@ -25,7 +27,9 @@ ambiguous or unsuccessful, explain the issue and ask the user to clarify; never 
 a player yourself.
 
 For a statistics question, resolve every named player and event before calling
-`query_analytics`. Pass only successful resolver results, preserving each
+`query_analytics`. For a named event, use its canonical competition name from the
+reference when calling the Event Resolver, even if the user used an alias. Pass only
+successful resolver results, preserving each
 `display_name` with its `player_id` or `event_id`. Pass successful resolved player
 pairs to `resolve_event` when available. If an event is ambiguous or not found,
 explain the issue and ask for clarification; never choose an event yourself. Years

@@ -44,9 +44,10 @@ def resolve_event(
         str,
         Field(
             description=(
-                "Use the competition catalog in the system prompt to choose the appropriate "
-                "canonical competition name or documented alias for the user's request. Do not "
-                "invent a name or alias. Pass one competition name without years or database IDs."
+                "Use the competition catalog in the system prompt to translate the user's "
+                "wording to its canonical competition name. Do not pass a documented alias; "
+                "aliases are for interpreting the user's request only. Do not invent a name or "
+                "alias. Pass one canonical competition name without years or database IDs."
             )
         ),
     ],

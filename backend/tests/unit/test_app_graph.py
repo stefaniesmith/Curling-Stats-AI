@@ -86,9 +86,10 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     )
     assert set(event_resolver_schema["properties"]) == {"name", "resolved_players"}
     assert event_resolver_schema["properties"]["name"]["description"] == (
-        "Use the competition catalog in the system prompt to choose the appropriate canonical "
-        "competition name or documented alias for the user's request. Do not invent a name or alias. "
-        "Pass one competition name without years or database IDs."
+        "Use the competition catalog in the system prompt to translate the user's wording to its "
+        "canonical competition name. Do not pass a documented alias; aliases are for interpreting "
+        "the user's request only. Do not invent a name or alias. Pass one canonical competition "
+        "name without years or database IDs."
     )
     assert "disambiguate otherwise matching events" in event_resolver_schema["properties"][
         "resolved_players"
@@ -100,6 +101,8 @@ def test_build_graph_configures_model_and_tools(monkeypatch: pytest.MonkeyPatch)
     system_prompt = captured["graph"]["prompt"]  # type: ignore[index]
     assert "Never generate, request, expose, or explain SQL" in system_prompt
     assert "Hearts | 1982–2025 | Available" in system_prompt
+    assert "do not pass an alias to that tool" in system_prompt
+    assert "use its canonical competition name" in system_prompt
     assert "no matching imported records were found" in system_prompt
     assert "analyst of Curling Canada player statistics" in system_prompt
     assert "lead comparisons with the main conclusion" in system_prompt

@@ -23,7 +23,7 @@ class CompetitionCatalog:
         if not records:
             return "No competitions have been imported yet."
         rows = [
-            "| Competition | Years covered | Shot statistics | Common aliases |",
+            "| Competition | Years covered | Shot statistics | Aliases — send canonical name to resolver |",
             "| --- | --- | --- | --- |",
         ]
         rows.extend(self._render_record(record) for record in records)
