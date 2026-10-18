@@ -25,6 +25,7 @@ node_modules/
 .pnpm-store/
 .vite/
 coverage/
+*.tsbuildinfo
 
 # Environment and local config
 .env
