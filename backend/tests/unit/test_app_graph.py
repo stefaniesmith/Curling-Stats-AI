@@ -251,6 +251,13 @@ def test_respond_to_message_collects_visualization_artifacts(monkeypatch: pytest
 def test_respond_to_message_omits_artifacts_from_prior_persisted_turns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class FakeCheckpointerContext:
+        def __enter__(self) -> object:
+            return object()
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
     class FakeGraph:
         def invoke(self, _: dict[str, object], config: dict[str, object]) -> dict[str, object]:
             return {
@@ -270,6 +277,11 @@ def test_respond_to_message_omits_artifacts_from_prior_persisted_turns(
                 ]
             }
 
+    monkeypatch.setattr(
+        app_graph.PostgresSaver,
+        "from_conn_string",
+        lambda _: FakeCheckpointerContext(),
+    )
     monkeypatch.setattr(app_graph, "build_graph", lambda settings=None, checkpointer=None: FakeGraph())
 
     response = app_graph.respond_to_message("Show current results", uuid4())
