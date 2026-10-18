@@ -1,8 +1,8 @@
 import logoUrl from "../../../../assets/CurlChatLogo.png";
 
 const prompts = [
-  "Show Brad Jacobs' stats at the 2026 Brier.",
-  "Compare Rachel Homan and Jennifer Jones from 2018-2024.",
+  "Show Rachel Homan's stats at the 2025 Scotties.",
+  "Compare Brad Jacobs and Brad Gushue from 2020-2026.",
   "Who had the highest draw percentage at the 2023 Hearts?",
 ];
 
