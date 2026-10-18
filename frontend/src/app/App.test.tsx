@@ -1,22 +1,9 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { jsonResponse, streamResponse } from "../test/http";
 import { App } from "./App";
-
-const jsonResponse = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-
-const streamResponse = (events: Array<{ type: string; payload: object }>) =>
-  new Response(
-    events
-      .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`)
-      .join(""),
-    { headers: { "Content-Type": "text/event-stream" } },
-  );
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
@@ -25,7 +12,9 @@ beforeEach(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("App", () => {
   it("creates a conversation on the first message and includes its ID on a follow-up", async () => {

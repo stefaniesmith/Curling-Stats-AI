@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { createElement } from "react";
-import { vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
+
+afterEach(cleanup);
 
 type PlotProps = {
   data: Array<{ marker?: { color?: string } }>;
