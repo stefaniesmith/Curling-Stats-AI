@@ -129,28 +129,21 @@ Those responsibilities belong to dedicated tools and application services.
 
 A typical request follows this sequence:
 
-```text
-User
-    │
-    ▼
-LangGraph Agent
-    │
-    ├── Player Resolver
-    │
-        ├── Event Resolver
-        │
-        ├── Analytics Query Tool
-    │
-    ├── Visualization Tool (optional)
-    │
-    ▼
-Structured Response
-    │
-    ▼
-Streaming API
-    │
-    ▼
-Frontend
+```mermaid
+flowchart TB
+    User --> Agent[LangGraph Agent]
+    Agent -->|selects as needed| Player[Player Resolver]
+    Agent -->|selects as needed| Event[Event Resolver]
+    Agent -->|selects as needed| Query[Analytics Query Tool]
+    Query -. after a successful query .-> Visualization[Visualization Tool]
+    Player --> Results[Tool results]
+    Event --> Results
+    Query --> Results
+    Visualization --> Results
+    Results --> Agent
+    Agent --> Response[Structured Response]
+    Response --> Stream[Streaming API]
+    Stream --> Frontend
 ```
 
 The agent determines which tools are required based on the user's request and combines their outputs into a coherent response.

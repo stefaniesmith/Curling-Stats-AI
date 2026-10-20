@@ -71,38 +71,24 @@ Each layer owns one responsibility.
 
 # High-Level Architecture
 
-```text
-                 React
-                   │
-        Conversation UI
-        Charts
-        Tables
-        Streaming
-                   │
-                   ▼
-               FastAPI
-         REST + Streaming API
-                   │
-                   ▼
-             LangGraph Agent
-      Planning & Conversation State
-                   │
-             LangGraph Tools
-                   │
-                   ▼
-         Application Services
-                   │
-        ┌──────────┼──────────┐
-        │          │          │
-        ▼          ▼          ▼
- PlayerResolver StatsService VisualizationService
-                   │
-                   ▼
-            Database Layer
-      SQLAlchemy + SQL Execution
-                   │
-                   ▼
-              PostgreSQL
+```mermaid
+flowchart TB
+    React["React<br/>Conversation UI, charts, tables, streaming"]
+    API["FastAPI<br/>REST and streaming API"]
+    Agent["LangGraph Agent<br/>Planning and conversation state"]
+    Tools[LangGraph Tools]
+    Services[Application Services]
+    PlayerResolver[Player Resolver]
+    StatsService[Statistics Service]
+    VisualizationService[Visualization Service]
+    DatabaseLayer["Database Layer<br/>SQLAlchemy and SQL execution"]
+    PostgreSQL[(PostgreSQL)]
+
+    React --> API --> Agent --> Tools --> Services
+    Services --> PlayerResolver
+    Services --> StatsService
+    Services --> VisualizationService
+    Services --> DatabaseLayer --> PostgreSQL
 ```
 
 Each layer communicates only with the layer directly below it.
@@ -115,17 +101,12 @@ The repository includes a Docker Compose configuration intended for local review
 It packages the browser-facing frontend separately from the backend while keeping
 the production-style boundary visible:
 
-```text
-Browser
-  │ http://localhost:5173
-  ▼
-Nginx frontend container
-  │ serves the Vite production build
-  │ proxies /api and /api/chat/stream
-  ▼
-FastAPI backend container ─────────► PostgreSQL container
-  │
-  └────────────────────────────────► Phoenix container (optional tracing)
+```mermaid
+flowchart LR
+    Browser -->|http://localhost:5173| Nginx["Nginx frontend container<br/>Serves the Vite production build<br/>Proxies /api and /api/chat/stream"]
+    Nginx --> Backend[FastAPI backend container]
+    Backend --> PostgreSQL[(PostgreSQL container)]
+    Backend -. optional tracing .-> Phoenix[Phoenix container]
 ```
 
 Nginx disables proxy buffering for the streaming route so Server-Sent Events
@@ -298,60 +279,21 @@ No other component should duplicate this information.
 
 A typical request follows this sequence.
 
-```text
-User
-
-↓
-
-React
-
-↓
-
-FastAPI
-
-↓
-
-LangGraph
-
-↓
-
-Tool
-
-↓
-
-Application Service
-
-↓
-
-Database Layer
-
-↓
-
-PostgreSQL
-
-↓
-
-Structured Results
-
-↓
-
-Application Service
-
-↓
-
-Tool
-
-↓
-
-LangGraph
-
-↓
-
-Streaming Response
-
-↓
-
-React
+```mermaid
+flowchart TB
+    User --> RequestUI[React]
+    RequestUI --> FastAPI
+    FastAPI --> LangGraph
+    LangGraph --> Tool
+    Tool --> Service[Application Service]
+    Service --> DatabaseLayer[Database Layer]
+    DatabaseLayer --> PostgreSQL[(PostgreSQL)]
+    PostgreSQL --> Results[Structured Results]
+    Results --> ResponseService[Application Service]
+    ResponseService --> ResponseTool[Tool]
+    ResponseTool --> ResponseAgent[LangGraph]
+    ResponseAgent --> Streaming[Streaming Response]
+    Streaming --> ResponseUI[React]
 ```
 
 Each component performs one responsibility before passing control to the next layer.
@@ -449,10 +391,51 @@ This creates a more responsive user experience and more closely resembles modern
 
 The architecture intentionally separates AI reasoning from application implementation.
 
+## LLM orchestration and deterministic execution
+
 The language model is responsible for making decisions.
 
 The application is responsible for executing those decisions safely and deterministically.
 
 This allows the strengths of modern language models—reasoning, planning, and natural language understanding—to be combined with the reliability, maintainability, and testability of conventional software engineering.
 
-The result is an application that is conversational, extensible, and suitable for production-quality software development.
+The tradeoff is additional application code: tool contracts, services, and
+validation must be designed and maintained explicitly rather than delegated to
+a prompt. In return, critical behavior can be tested and changed without
+depending on a particular model response.
+
+## Structured analytics over retrieval-first answers
+
+CurlChat answers questions that depend on filtering, grouping, ranking, and
+calculating statistics across historical records. PostgreSQL is therefore the
+authoritative source for analytics, and the Analytics Query Tool executes
+bounded queries against the structured schema.
+
+Retrieval can help find unstructured supporting material, but it is not a
+reliable substitute for aggregation and filter semantics over player
+statistics. The tradeoff is that the application must maintain a clear schema,
+import pipeline, and query-validation boundary. In return, results remain
+traceable to the imported statistical records and can be reproduced with the
+same filters.
+
+## Least-privilege data access
+
+The importer and migrations use an owner connection, the running application
+uses a read-only analytics role, and conversation state uses a separate role.
+Those database permissions are the authoritative enforcement boundary rather
+than an instruction the model is expected to follow.
+
+The tradeoff is additional connection and role-provisioning configuration. In
+return, an analytics query cannot modify imported statistics, and a compromise
+in one access path has a narrower scope.
+
+## Structured response artifacts
+
+The backend produces validated Markdown, table, summary, and chart artifacts;
+the frontend renders them as typed UI components and Plotly visualizations.
+The model selects a useful presentation through the Visualization Tool, but it
+does not generate browser code or directly construct chart data in the client.
+
+The tradeoff is a deliberately limited set of supported artifact types and
+visualization mappings. In return, the frontend has a stable rendering
+contract, and presentation behavior can be tested independently of model text.

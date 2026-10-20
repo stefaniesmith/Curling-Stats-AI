@@ -154,12 +154,11 @@ not stored; they are derived from player stints using total-weighted percentages
 
 The schema has a straightforward relational structure.
 
-```text
-players
-    │
-    ├──< player_aliases
-    │
-    └──< player_event_statistics >── events
+```mermaid
+erDiagram
+    players ||--o{ player_aliases : has
+    players ||--o{ player_event_statistics : has
+    events ||--o{ player_event_statistics : groups
 ```
 
 This design keeps relationships simple while supporting a wide variety of analytical queries.

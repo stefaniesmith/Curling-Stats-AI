@@ -44,18 +44,13 @@ analytics input.
 
 ## Import Workflow
 
-```text
-Markdown Files
-        ↓
-Parse YAML Front Matter
-        ↓
-Resolve Canonical Players and Aliases
-        ↓
-Normalize Events
-        ↓
-Extract Yearly Player Stints
-        ↓
-Load PostgreSQL
+```mermaid
+flowchart TB
+    Source[Archive Markdown files] --> Parse[Parse YAML front matter]
+    Parse --> Players[Resolve canonical players and aliases]
+    Players --> Events[Normalize events]
+    Events --> Stints[Extract yearly player stints]
+    Stints --> PostgreSQL[(Load PostgreSQL)]
 ```
 
 The command accepts the root of a local archive checkout:

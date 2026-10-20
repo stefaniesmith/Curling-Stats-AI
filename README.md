@@ -21,6 +21,36 @@ CurlChat compares player performance using source-grounded statistics and an int
 
 <img src="assets/player_comparison_screenshot.png" alt="CurlChat response comparing Brad Jacobs and Brad Gushue at the Brier from 2020 through 2026" width="1000" />
 
+## Architecture
+
+The LLM interprets requests and orchestrates tools; deterministic services handle
+player and event matching, safe read-only access to statistics, and the charts
+and tables displayed in the interface.
+
+```mermaid
+flowchart LR
+    User[User] --> Frontend[React frontend]
+    Frontend --> API[FastAPI API]
+    API --> Agent[LangGraph agent]
+    Agent <--> LLM[LLM]
+    Agent --> Tools[Deterministic tools]
+    Agent --> State[(Conversation state)]
+    Tools --> Analytics[(PostgreSQL analytics)]
+    Tools --> Artifacts[Typed response artifacts]
+    Artifacts --> Frontend
+```
+
+See the [architecture documentation](docs/01-architecture.md), [agent design](docs/04-agent.md), and [tool boundaries](docs/05-tools.md) for implementation details.
+
+## Project structure
+
+* `backend` — FastAPI application, agent orchestration, deterministic services, data models, and tests.
+* `frontend` — React, TypeScript, and Vite chat interface.
+* `docs` — architecture and implementation source of truth.
+* `assets` — shared brand assets used by the README and frontend.
+
+See the [project overview](docs/00-project-overview.md).
+
 ## Run it locally with Docker
 
 This project is intended to be easy to review and run on a local machine. Docker Compose starts PostgreSQL, the FastAPI application, a production-style Nginx frontend, and Phoenix for optional local tracing. The frontend is available at [http://localhost:5173](http://localhost:5173); its Nginx container serves the Vite production build and proxies both ordinary API requests and streaming responses to the backend.
@@ -85,12 +115,3 @@ Stop the stack with `docker compose down`. PostgreSQL and Phoenix data remain in
 ### Development mode
 
 The Docker stack uses Nginx to serve a production Vite build. For frontend iteration, run only the supporting services with `docker compose up -d postgres phoenix`, start the backend using the commands in the backend README, then run `pnpm install` and `pnpm dev` from `frontend`. Vite's development server serves the frontend on its own and proxies `/api` to FastAPI; it is not part of the Docker stack.
-
-## Project structure
-
-* `backend` — FastAPI application, agent orchestration, deterministic services, data models, and tests.
-* `frontend` — React, TypeScript, and Vite chat interface.
-* `docs` — architecture and implementation source of truth.
-* `assets` — shared brand assets used by the README and frontend.
-
-See the project overview in `docs/00-project-overview.md`.

@@ -6,26 +6,19 @@ The CurlChat agent delegates specialized work to a small set of tools. Each tool
 
 This separation allows the agent to focus on understanding user intent and orchestrating workflows, while individual tools encapsulate domain-specific logic.
 
-The current architecture consists of four primary tools:
+The current architecture exposes four primary tools. The agent selects the
+tools required for each request.
 
-```text
-Player Resolver
-        │
-        ▼
-Event Resolver
-        │
-        ▼
-Analytics Query Tool
-        │
-        ▼
-Visualization Tool
-```
+| Tool | Responsibility | When used |
+| --- | --- | --- |
+| Player Resolver | Matches a player name or alias to a canonical player identity. | When a request names a player. |
+| Event Resolver | Matches an event name to a canonical competition identity. | When a request names an event. |
+| Analytics Query Tool | Retrieves statistics through validated, read-only analytics access. | After the relevant identities are resolved. |
+| Visualization Tool | Produces a typed chart, table, or summary from the latest successful analytics result. | After a successful query, when a visual response is useful. |
 
-Each tool is designed to operate independently and can evolve without requiring significant changes to the agent itself.
-
-The initial LangGraph implementation exposes all four tools. The Visualization
-Tool creates artifacts from an already-successful Analytics Query Tool result;
-it never queries the database or renders charts itself.
+Player and event resolution may happen independently or together. The
+Visualization Tool operates only on the latest successful Analytics Query Tool
+result; it never queries the database or renders charts.
 
 ---
 
@@ -80,49 +73,31 @@ This allows functionality to be verified without requiring the entire conversati
 
 ### Purpose
 
-The Player Resolver converts player names supplied by the user into canonical player identities used throughout the application.
-
-This hides historical aliases and alternate spellings from the rest of the system.
-
----
+The Player Resolver converts a player name into a canonical player identity used
+by the Analytics Query Tool.
 
 ### Responsibilities
 
-* resolve player aliases
-* identify canonical player records
-* handle historical player names
-* return canonical player identifiers
-
----
+* match canonical player names and imported aliases
+* match clear spelling variations
+* return ambiguity rather than silently choosing between players
+* report whether a successful match used an alias
 
 ### Inputs
 
 * player names extracted from the user's request
 
----
-
 ### Outputs
 
-* canonical player identifiers
-* canonical player names
+* canonical player identity pairs (`display_name` and `player_id`)
+* ambiguous player candidates when clarification is required
 
----
+The resolver checks canonical names and aliases before considering clear fuzzy
+matches. If multiple candidates remain, the agent must ask the user to clarify;
+it never chooses a player itself.
 
-### Workflow
-
-```text
-Player Name
-        │
-        ▼
-Alias Resolution
-        │
-        ▼
-Canonical Player
-```
-
-The Player Resolver is responsible only for identity resolution.
-
-It does not generate analytical queries or access player statistics.
+The Player Resolver does not access player statistics or generate analytical
+queries.
 
 ---
 
